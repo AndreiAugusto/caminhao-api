@@ -2,6 +2,8 @@ import { Body, Controller, Get, Param, Patch, Post } from '@nestjs/common';
 import { UsuarioService } from './usuario.service';
 import { CreateUsuarioDto } from './dto/create-usuario.dto';
 import { UpdateUsuarioDto } from './dto/update-usuario.dto';
+const bcrypt = require('bcrypt');
+const jwt = require('jsonwebtoken');
 
 @Controller('usuario')
 export class UsuarioController {
@@ -25,5 +27,56 @@ export class UsuarioController {
   @Patch(':id')
   update(@Param('id') id: string, @Body() updateUsuarioDto: UpdateUsuarioDto) {
     return this.usuarioService.update(+id, updateUsuarioDto);
+  }
+
+  @Post('login')
+  async login(@Body() loginDto: { email: string; password: string }) {
+    const { email, password } = loginDto;
+    if(!email || !password) {
+      return { message: 'Email e senha são obrigatórios!' };
+    }
+    const userExists = await this.usuarioService.findOneByEmail({ email });
+    if (!userExists || !Array.isArray(userExists) || userExists.length === 0) {
+      return { message: 'Usuário não encontrado!' };
+    }
+    const user = userExists[0];
+
+    const isPasswordValid = await bcrypt.compare(password, user.senha);
+    if (!isPasswordValid) {
+      return { message: 'Senha incorreta!' };
+    }
+
+    const accessToken = jwt.sign(
+                { id: user.id,
+                  nome: user.nome
+                 },
+                process.env.TOKEN_SECRET,
+                { expiresIn: process.env.TOKEN_EXPIRES_IN }
+            );
+    // const accessToken = 'teste';
+    return { user:{ id: user.id, name: user.nome, email: user.email }, accessToken };
+  }
+
+  @Post('register')
+  async register(@Body() createUsuarioDto: CreateUsuarioDto) {
+    const { email, nome, senha } = createUsuarioDto;
+    if(!email || !nome || !senha) {
+      return { message: 'Nome, email e senha são obrigatórios!' };
+    }
+    const userExists = await this.usuarioService.findOneByEmail({ email });
+    if (userExists && Array.isArray(userExists) && userExists.length > 0) {
+      return { message: 'Usuário já existe!' };
+    }
+    const hashedPassword = await bcrypt.hash(
+      senha, 
+      Number(process.env.SALT)
+    );
+
+    const newUser = await this.usuarioService.createUsuario({
+      nome,
+      email,
+      senha: hashedPassword,
+    });
+    return newUser;
   }
 }

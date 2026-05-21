@@ -8,9 +8,10 @@ import { MotoristaModule } from './motorista/motorista.module';
 import { OficinaModule } from './oficina/oficina.module';
 import { CaminhaoMotoristaModule } from './caminhao-motorista/caminhao-motorista.module';
 import { ManutencaoModule } from './manutencao/manutencao.module';
+import { DashboardModule } from './dashboard/dashboard.module';
 
 @Module({
-  imports: [CaminhaoModule, ConfigModule.forRoot(), UsuarioModule, MotoristaModule, OficinaModule, CaminhaoMotoristaModule, ManutencaoModule],
+  imports: [CaminhaoModule, ConfigModule.forRoot(), UsuarioModule, MotoristaModule, OficinaModule, CaminhaoMotoristaModule, ManutencaoModule, DashboardModule],
   controllers: [AppController],
   providers: [AppService],
 })

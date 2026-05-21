@@ -33,6 +33,16 @@ export class UsuarioService {
         }
     }
 
+    async findOneByEmail({ email }: { email: string }) {
+        try {
+            const data = await this.sql`Select * from usuario where email = ${email}`;
+            return data;            
+        } catch (error) {
+            console.error('Erro ao buscar usuário:', error);
+            return { message: 'Erro ao buscar usuário!', error: error };
+        }
+    }
+
     async createUsuario(createUsuarioDto: CreateUsuarioDto){
         try {
             await this.sql`INSERT INTO usuario (nome, email, senha) VALUES (${createUsuarioDto.nome}, ${createUsuarioDto.email}, ${createUsuarioDto.senha})`;
