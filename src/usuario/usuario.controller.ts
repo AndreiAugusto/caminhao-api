@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, HttpCode, HttpStatus, BadRequestException, UnauthorizedException, ConflictException } from '@nestjs/common';
 import { UsuarioService } from './usuario.service';
 import { CreateUsuarioDto } from './dto/create-usuario.dto';
 import { UpdateUsuarioDto } from './dto/update-usuario.dto';
@@ -30,20 +30,21 @@ export class UsuarioController {
   }
 
   @Post('login')
+  @HttpCode(HttpStatus.OK)
   async login(@Body() loginDto: { email: string; password: string }) {
     const { email, password } = loginDto;
     if(!email || !password) {
-      return { message: 'Email e senha são obrigatórios!' };
+      throw new BadRequestException('Email e senha são obrigatórios!');
     }
     const userExists = await this.usuarioService.findOneByEmail({ email });
     if (!userExists || !Array.isArray(userExists) || userExists.length === 0) {
-      return { message: 'Usuário não encontrado!' };
+      throw new UnauthorizedException('Usuário não encontrado!');
     }
     const user = userExists[0];
 
     const isPasswordValid = await bcrypt.compare(password, user.senha);
     if (!isPasswordValid) {
-      return { message: 'Senha incorreta!' };
+      throw new UnauthorizedException('Senha incorreta!');
     }
 
     const accessToken = jwt.sign(
@@ -58,14 +59,15 @@ export class UsuarioController {
   }
 
   @Post('register')
+  @HttpCode(HttpStatus.CREATED)
   async register(@Body() createUsuarioDto: CreateUsuarioDto) {
     const { email, nome, senha } = createUsuarioDto;
     if(!email || !nome || !senha) {
-      return { message: 'Nome, email e senha são obrigatórios!' };
+      throw new BadRequestException('Nome, email e senha são obrigatórios!');
     }
     const userExists = await this.usuarioService.findOneByEmail({ email });
     if (userExists && Array.isArray(userExists) && userExists.length > 0) {
-      return { message: 'Usuário já existe!' };
+      throw new ConflictException('Usuário já existe!');
     }
     const hashedPassword = await bcrypt.hash(
       senha, 
