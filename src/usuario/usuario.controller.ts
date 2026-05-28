@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post, HttpCode, HttpStatus, BadRequestException, UnauthorizedException, ConflictException } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, HttpCode, HttpStatus, BadRequestException, UnauthorizedException, ConflictException, NotFoundException } from '@nestjs/common';
 import { UsuarioService } from './usuario.service';
 import { CreateUsuarioDto } from './dto/create-usuario.dto';
 import { UpdateUsuarioDto } from './dto/update-usuario.dto';
@@ -38,7 +38,7 @@ export class UsuarioController {
     }
     const userExists = await this.usuarioService.findOneByEmail({ email });
     if (!userExists || !Array.isArray(userExists) || userExists.length === 0) {
-      throw new UnauthorizedException('Usuário não encontrado!');
+      throw new NotFoundException('Usuário não encontrado!');
     }
     const user = userExists[0];
 
