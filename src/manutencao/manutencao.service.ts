@@ -27,11 +27,23 @@ export class ManutencaoService {
 
   async findAll() {
     try {
-        const data = await this.sql`Select * from "Manutencao"`;
-        return data;            
+      const data = await this.sql`
+        SELECT 
+          m.id,
+          m.descricao,
+          m.custo,
+          m.data,
+          c.placa AS "placaCaminhao",
+          o."nomeOficina" AS "nomeOficina"
+        FROM "Manutencao" m
+        JOIN "Caminhao" c ON c.id = m."caminhaoId"
+        JOIN "Oficina" o ON o.id = m."oficinaId"
+        ORDER BY m.data DESC
+      `;
+      return data;
     } catch (error) {
-        console.error('Erro ao buscar manutenções:', error);
-        return { message: 'Erro ao buscar manutenções!', error: error };
+      console.error('Erro ao buscar manutenções:', error);
+      return { message: 'Erro ao buscar manutenções!', error: error };
     }
   }
 
