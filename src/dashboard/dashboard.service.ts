@@ -78,6 +78,55 @@ export class DashboardService {
     }
   }
 
+  async ultimasMovimentacoes(limite: number) {
+    try {
+      const data = await this.sql`
+        SELECT * FROM (
+          SELECT
+            'frete' AS tipo,
+            f.id,
+            f.data,
+            f.valor AS valor,
+            COALESCE(f.descricao, CONCAT(origem.nome, ' → ', destino.nome)) AS descricao,
+            c.placa AS "identificador"
+          FROM "Frete" f
+          JOIN "Caminhao" c ON c.id = f."caminhaoId"
+          LEFT JOIN "Cidade" origem ON origem.id = f.origem
+          LEFT JOIN "Cidade" destino ON destino.id = f.destino
+
+          UNION ALL
+
+          SELECT
+            'manutencao' AS tipo,
+            m.id,
+            m.data,
+            m.custo AS valor,
+            m.descricao,
+            c.placa AS "identificador"
+          FROM "Manutencao" m
+          JOIN "Caminhao" c ON c.id = m."caminhaoId"
+
+          UNION ALL
+
+          SELECT
+            'abastecimento' AS tipo,
+            a.id,
+            a.data,
+            a."custoTotal" AS valor,
+            CONCAT(a.litros, ' litros') AS descricao,
+            c.placa AS "identificador"
+          FROM "Abastecimento" a
+          JOIN "Caminhao" c ON c.id = a."caminhaoId"
+        ) movimentacoes
+        ORDER BY data DESC
+        LIMIT ${limite}
+      `;
+      return data;
+    } catch (error) {
+      return { message: 'Erro ao buscar últimas movimentações!', error };
+    }
+  }
+
   async resumoMes(mes: number, ano: number) {
     try {
       const [fretes, manutencoes, abastecimentos] = await Promise.all([

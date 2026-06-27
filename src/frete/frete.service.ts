@@ -19,14 +19,17 @@ export class FreteService {
         return { message: 'Verifique os campos obrigatórios!' };
       }
       await this.sql`
-        INSERT INTO "Frete" (descricao, valor, data, "caminhaoId", "motoristaId", "porcentagemMotorista")
+        INSERT INTO "Frete" (descricao, valor, data, "caminhaoId", "motoristaId", "porcentagemMotorista", "origemId", "destinoId", "cargaId")
         VALUES (
           ${createFreteDto.descricao ?? null},
           ${createFreteDto.valor},
           ${createFreteDto.data},
           ${createFreteDto.caminhaoId},
           ${createFreteDto.motoristaId},
-          ${createFreteDto.porcentagemMotorista ?? 30}
+          ${createFreteDto.porcentagemMotorista ?? 30},
+          ${createFreteDto.origemId ?? null},
+          ${createFreteDto.destinoId ?? null},
+          ${createFreteDto.cargaId ?? null}
         )
       `;
       return { message: 'Frete registrado com sucesso!' };
@@ -39,10 +42,20 @@ export class FreteService {
   async findAll() {
     try {
       const data = await this.sql`
-        SELECT f.*, m."nomeMotorista", c.modelo AS "modeloCaminhao", c.placa
+        SELECT
+          f.*,
+          m."nomeMotorista",
+          c.modelo AS "modeloCaminhao",
+          c.placa,
+          origem.nome AS "nomeOrigem",
+          destino.nome AS "nomeDestino",
+          carga.nome AS "nomeCarga"
         FROM "Frete" f
         JOIN "Motorista" m ON m.id = f."motoristaId"
         JOIN "Caminhao" c ON c.id = f."caminhaoId"
+        LEFT JOIN "Cidade" origem ON origem.id = f."origemId"
+        LEFT JOIN "Cidade" destino ON destino.id = f."destinoId"
+        LEFT JOIN "Carga" carga ON carga.id = f."cargaId"
         ORDER BY f.data DESC
       `;
       return data;
@@ -55,13 +68,23 @@ export class FreteService {
   async findOne(id: number) {
     try {
       const data = await this.sql`
-        SELECT f.*, m."nomeMotorista", c.modelo AS "modeloCaminhao", c.placa
+        SELECT
+          f.*,
+          m."nomeMotorista",
+          c.modelo AS "modeloCaminhao",
+          c.placa,
+          origem.nome AS "nomeOrigem",
+          destino.nome AS "nomeDestino",
+          carga.nome AS "nomeCarga"
         FROM "Frete" f
         JOIN "Motorista" m ON m.id = f."motoristaId"
         JOIN "Caminhao" c ON c.id = f."caminhaoId"
+        LEFT JOIN "Cidade" origem ON origem.id = f."origemId"
+        LEFT JOIN "Cidade" destino ON destino.id = f."destinoId"
+        LEFT JOIN "Carga" carga ON carga.id = f."cargaId"
         WHERE f.id = ${id}
       `;
-      return data;
+      return data[0] ?? null;
     } catch (error) {
       console.error('Erro ao buscar frete:', error);
       return { message: 'Erro ao buscar frete!', error };
@@ -87,6 +110,15 @@ export class FreteService {
       }
       if (updateFreteDto.porcentagemMotorista !== undefined) {
         await this.sql`UPDATE "Frete" SET "porcentagemMotorista" = ${updateFreteDto.porcentagemMotorista} WHERE id = ${id}`;
+      }
+      if (updateFreteDto.origemId !== undefined) {
+        await this.sql`UPDATE "Frete" SET "origemId" = ${updateFreteDto.origemId} WHERE id = ${id}`;
+      }
+      if (updateFreteDto.destinoId !== undefined) {
+        await this.sql`UPDATE "Frete" SET "destinoId" = ${updateFreteDto.destinoId} WHERE id = ${id}`;
+      }
+      if (updateFreteDto.cargaId !== undefined) {
+        await this.sql`UPDATE "Frete" SET "cargaId" = ${updateFreteDto.cargaId} WHERE id = ${id}`;
       }
       return { message: 'Frete atualizado com sucesso!' };
     } catch (error) {

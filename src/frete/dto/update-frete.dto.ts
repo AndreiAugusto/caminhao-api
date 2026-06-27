@@ -18,4 +18,13 @@ export class UpdateFreteDto {
 
   @ApiPropertyOptional({ example: 30 })
   porcentagemMotorista?: number;
+
+  @ApiPropertyOptional({ example: 1, description: 'ID da cidade de origem' })
+  origemId?: number;
+
+  @ApiPropertyOptional({ example: 2, description: 'ID da cidade de destino' })
+  destinoId?: number;
+
+  @ApiPropertyOptional({ example: 1, description: 'ID do tipo de carga' })
+  cargaId?: number;
 }

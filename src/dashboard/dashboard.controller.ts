@@ -57,4 +57,11 @@ export class DashboardController {
   resumoMes(@Query('mes') mes: string, @Query('ano') ano: string) {
     return this.dashboardService.resumoMes(+mes, +ano);
   }
+
+  @ApiOperation({ summary: 'Últimas movimentações (fretes, manutenções, abastecimentos)' })
+  @ApiQuery({ name: 'limite', required: false, example: 10, description: 'Quantidade de registros (padrão: 10)' })
+  @Get('ultimas-movimentacoes')
+  ultimasMovimentacoes(@Query('limite') limite?: string) {
+    return this.dashboardService.ultimasMovimentacoes(+(limite ?? 10));
+  }
 }

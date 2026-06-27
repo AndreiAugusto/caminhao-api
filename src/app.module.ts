@@ -13,6 +13,9 @@ import { DashboardModule } from './dashboard/dashboard.module';
 import { FreteModule } from './frete/frete.module';
 import { AbastecimentoModule } from './abastecimento/abastecimento.module';
 import { JwtAuthGuard } from './auth/jwt.guard';
+import { EstadoModule } from './estado/estado.module';
+import { CidadeModule } from './cidade/cidade.module';
+import { CargaModule } from './carga/carga.module';
 
 @Module({
   imports: [
@@ -26,6 +29,9 @@ import { JwtAuthGuard } from './auth/jwt.guard';
     DashboardModule,
     FreteModule,
     AbastecimentoModule,
+    EstadoModule,
+    CidadeModule,
+    CargaModule,
   ],
   controllers: [AppController],
   providers: [
