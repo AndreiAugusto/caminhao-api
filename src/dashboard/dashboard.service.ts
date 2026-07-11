@@ -129,7 +129,7 @@ export class DashboardService {
 
   async resumoMes(mes: number, ano: number) {
     try {
-      const [fretes, manutencoes, abastecimentos] = await Promise.all([
+      const [fretes, manutencoes, abastecimentos, custosFixos] = await Promise.all([
         this.sql`
           SELECT
             COUNT(*) AS "totalFretes",
@@ -141,10 +141,10 @@ export class DashboardService {
         this.sql`
           SELECT
             COUNT(*) AS "totalManutencoes",
-            COALESCE(SUM(custo), 0) AS "custoManutencoes"
-          FROM "Manutencao"
-          WHERE EXTRACT(MONTH FROM data) = ${mes}
-            AND EXTRACT(YEAR FROM data) = ${ano}
+            COALESCE(SUM(mp.valor), 0) AS "custoManutencoes"
+          FROM "ManutencaoParcela" mp
+          WHERE EXTRACT(MONTH FROM mp."dataVencimento") = ${mes}
+            AND EXTRACT(YEAR FROM mp."dataVencimento") = ${ano}
         `,
         this.sql`
           SELECT
@@ -154,12 +154,21 @@ export class DashboardService {
           WHERE EXTRACT(MONTH FROM data) = ${mes}
             AND EXTRACT(YEAR FROM data) = ${ano}
         `,
+        this.sql`
+          SELECT
+            COUNT(*) AS "totalCustosFixos",
+            COALESCE(SUM(valor), 0) AS "custoFixo"
+          FROM "CustoFixo"
+          WHERE "dataInicio" <= (DATE_TRUNC('month', MAKE_DATE(${ano}, ${mes}, 1)) + INTERVAL '1 month - 1 day')
+            AND ("dataFim" IS NULL OR "dataFim" >= DATE_TRUNC('month', MAKE_DATE(${ano}, ${mes}, 1)))
+        `,
       ]);
 
       const receitaBruta = Number(fretes[0].receitaBruta);
       const custoManutencoes = Number(manutencoes[0].custoManutencoes);
       const custoAbastecimentos = Number(abastecimentos[0].custoAbastecimentos);
-      const saldoLiquido = receitaBruta - custoManutencoes - custoAbastecimentos;
+      const custoFixo = Number(custosFixos[0].custoFixo);
+      const saldoLiquido = receitaBruta - custoManutencoes - custoAbastecimentos - custoFixo;
 
       return {
         mes,
@@ -176,10 +185,126 @@ export class DashboardService {
           total: Number(abastecimentos[0].totalAbastecimentos),
           custo: custoAbastecimentos,
         },
+        custosFixos: {
+          total: Number(custosFixos[0].totalCustosFixos),
+          custo: custoFixo,
+        },
         saldoLiquido,
       };
     } catch (error) {
       return { message: 'Erro ao buscar resumo do mês!', error };
+    }
+  }
+
+  async extrato(filtros: {
+    dataInicio?: string;
+    dataFim?: string;
+    tipos?: string[];
+    caminhaoId?: number;
+    motoristaId?: number;
+  }) {
+    try {
+      const dataInicio = filtros.dataInicio ?? '2000-01-01';
+      const hoje = new Date();
+      const ultimoDiaMesAtual = new Date(Date.UTC(hoje.getUTCFullYear(), hoje.getUTCMonth() + 1, 0))
+        .toISOString()
+        .slice(0, 10);
+      const dataFim = filtros.dataFim ?? ultimoDiaMesAtual;
+
+      const tiposSet = filtros.tipos && filtros.tipos.length > 0 ? new Set(filtros.tipos) : null;
+      const incluirFrete = !tiposSet || tiposSet.has('frete');
+      const incluirAbastecimento = !tiposSet || tiposSet.has('abastecimento');
+      const incluirManutencao = !tiposSet || tiposSet.has('manutencao');
+      const incluirCustoFixo = !tiposSet || tiposSet.has('custo-fixo');
+
+      const caminhaoId = filtros.caminhaoId ?? null;
+      const motoristaId = filtros.motoristaId ?? null;
+
+      const data = await this.sql`
+        SELECT * FROM (
+          SELECT
+            'frete' AS tipo,
+            f.data,
+            c.placa,
+            m."nomeMotorista" AS motorista,
+            NULL::text AS empresa,
+            COALESCE(f.descricao, 'Frete') AS historico,
+            NULL::numeric AS despesas,
+            f.valor AS receitas
+          FROM "Frete" f
+          JOIN "Caminhao" c ON c.id = f."caminhaoId"
+          JOIN "Motorista" m ON m.id = f."motoristaId"
+          WHERE ${incluirFrete}::boolean
+            AND f.data BETWEEN ${dataInicio}::date AND ${dataFim}::date
+            AND (${caminhaoId}::int IS NULL OR f."caminhaoId" = ${caminhaoId}::int)
+            AND (${motoristaId}::int IS NULL OR f."motoristaId" = ${motoristaId}::int)
+
+          UNION ALL
+
+          SELECT
+            'abastecimento' AS tipo,
+            a.data,
+            c.placa,
+            NULL::text AS motorista,
+            NULL::text AS empresa,
+            CONCAT(a.litros, ' litros') AS historico,
+            a."custoTotal" AS despesas,
+            NULL::numeric AS receitas
+          FROM "Abastecimento" a
+          JOIN "Caminhao" c ON c.id = a."caminhaoId"
+          WHERE ${incluirAbastecimento}::boolean
+            AND a.data BETWEEN ${dataInicio}::date AND ${dataFim}::date
+            AND (${caminhaoId}::int IS NULL OR a."caminhaoId" = ${caminhaoId}::int)
+            AND ${motoristaId}::int IS NULL
+
+          UNION ALL
+
+          SELECT
+            'manutencao' AS tipo,
+            mp."dataVencimento" AS data,
+            c.placa,
+            NULL::text AS motorista,
+            o."nomeOficina" AS empresa,
+            COALESCE(m.descricao, 'Manutenção') AS historico,
+            mp.valor AS despesas,
+            NULL::numeric AS receitas
+          FROM "ManutencaoParcela" mp
+          JOIN "Manutencao" m ON m.id = mp."manutencaoId"
+          JOIN "Caminhao" c ON c.id = m."caminhaoId"
+          JOIN "Oficina" o ON o.id = m."oficinaId"
+          WHERE ${incluirManutencao}::boolean
+            AND mp."dataVencimento" BETWEEN ${dataInicio}::date AND ${dataFim}::date
+            AND (${caminhaoId}::int IS NULL OR m."caminhaoId" = ${caminhaoId}::int)
+            AND ${motoristaId}::int IS NULL
+
+          UNION ALL
+
+          SELECT
+            'custo-fixo' AS tipo,
+            gs.mes::date AS data,
+            c.placa,
+            NULL::text AS motorista,
+            COALESCE(cf.categoria, 'Custo Fixo') AS empresa,
+            cf.descricao AS historico,
+            cf.valor AS despesas,
+            NULL::numeric AS receitas
+          FROM "CustoFixo" cf
+          LEFT JOIN "Caminhao" c ON c.id = cf."caminhaoId"
+          CROSS JOIN LATERAL generate_series(
+            GREATEST(DATE_TRUNC('month', cf."dataInicio"), DATE_TRUNC('month', ${dataInicio}::date)),
+            LEAST(DATE_TRUNC('month', COALESCE(cf."dataFim", ${dataFim}::date)), DATE_TRUNC('month', ${dataFim}::date)),
+            INTERVAL '1 month'
+          ) AS gs(mes)
+          WHERE ${incluirCustoFixo}::boolean
+            AND (${caminhaoId}::int IS NULL OR cf."caminhaoId" = ${caminhaoId}::int)
+            AND ${motoristaId}::int IS NULL
+        ) extrato
+        ORDER BY data DESC
+      `;
+      return data;
+    } catch (error) {
+      console.error('Erro ao buscar extrato:', error);
+      return { message: 'Erro ao buscar extrato!', error };
     }
   }
 }

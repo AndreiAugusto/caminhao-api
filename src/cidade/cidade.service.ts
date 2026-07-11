@@ -16,7 +16,7 @@ export class CidadeService {
       const data = await this.sql`
         SELECT c.*, e.nome AS "nomeEstado", e.sigla AS "siglaEstado"
         FROM "Cidade" c
-        JOIN "Estado" e ON e.id = c."estadoId"
+        JOIN "Estado" e ON e.id = c.estado_id
         ORDER BY c.nome ASC
       `;
       return data;
@@ -31,7 +31,7 @@ export class CidadeService {
       const data = await this.sql`
         SELECT c.*, e.nome AS "nomeEstado", e.sigla AS "siglaEstado"
         FROM "Cidade" c
-        JOIN "Estado" e ON e.id = c."estadoId"
+        JOIN "Estado" e ON e.id = c.estado_id
         WHERE c.id = ${id}
       `;
       return data[0] ?? null;

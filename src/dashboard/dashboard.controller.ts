@@ -64,4 +64,27 @@ export class DashboardController {
   ultimasMovimentacoes(@Query('limite') limite?: string) {
     return this.dashboardService.ultimasMovimentacoes(+(limite ?? 10));
   }
+
+  @ApiOperation({ summary: 'Extrato unificado de movimentações (frete, abastecimento, manutenção, custo fixo)' })
+  @ApiQuery({ name: 'dataInicio', required: false, example: '2026-01-01' })
+  @ApiQuery({ name: 'dataFim', required: false, example: '2026-12-31' })
+  @ApiQuery({ name: 'tipos', required: false, example: 'frete,manutencao', description: 'Lista separada por vírgula: frete,abastecimento,manutencao,custo-fixo' })
+  @ApiQuery({ name: 'caminhaoId', required: false, example: 1 })
+  @ApiQuery({ name: 'motoristaId', required: false, example: 1 })
+  @Get('extrato')
+  extrato(
+    @Query('dataInicio') dataInicio?: string,
+    @Query('dataFim') dataFim?: string,
+    @Query('tipos') tipos?: string,
+    @Query('caminhaoId') caminhaoId?: string,
+    @Query('motoristaId') motoristaId?: string,
+  ) {
+    return this.dashboardService.extrato({
+      dataInicio,
+      dataFim,
+      tipos: tipos ? tipos.split(',').map((t) => t.trim()).filter(Boolean) : undefined,
+      caminhaoId: caminhaoId ? +caminhaoId : undefined,
+      motoristaId: motoristaId ? +motoristaId : undefined,
+    });
+  }
 }

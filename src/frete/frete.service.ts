@@ -19,7 +19,7 @@ export class FreteService {
         return { message: 'Verifique os campos obrigatórios!' };
       }
       await this.sql`
-        INSERT INTO "Frete" (descricao, valor, data, "caminhaoId", "motoristaId", "porcentagemMotorista", "origemId", "destinoId", "cargaId")
+        INSERT INTO "Frete" (descricao, valor, data, "caminhaoId", "motoristaId", "porcentagemMotorista", "origem", "destino", "carga")
         VALUES (
           ${createFreteDto.descricao ?? null},
           ${createFreteDto.valor},
@@ -53,9 +53,9 @@ export class FreteService {
         FROM "Frete" f
         JOIN "Motorista" m ON m.id = f."motoristaId"
         JOIN "Caminhao" c ON c.id = f."caminhaoId"
-        LEFT JOIN "Cidade" origem ON origem.id = f."origemId"
-        LEFT JOIN "Cidade" destino ON destino.id = f."destinoId"
-        LEFT JOIN "Carga" carga ON carga.id = f."cargaId"
+        LEFT JOIN "Cidade" origem ON origem.id = f."origem"
+        LEFT JOIN "Cidade" destino ON destino.id = f."destino"
+        LEFT JOIN "Carga" carga ON carga.id = f."carga"
         ORDER BY f.data DESC
       `;
       return data;
@@ -79,9 +79,9 @@ export class FreteService {
         FROM "Frete" f
         JOIN "Motorista" m ON m.id = f."motoristaId"
         JOIN "Caminhao" c ON c.id = f."caminhaoId"
-        LEFT JOIN "Cidade" origem ON origem.id = f."origemId"
-        LEFT JOIN "Cidade" destino ON destino.id = f."destinoId"
-        LEFT JOIN "Carga" carga ON carga.id = f."cargaId"
+        LEFT JOIN "Cidade" origem ON origem.id = f."origem"
+        LEFT JOIN "Cidade" destino ON destino.id = f."destino"
+        LEFT JOIN "Carga" carga ON carga.id = f."carga"
         WHERE f.id = ${id}
       `;
       return data[0] ?? null;
@@ -112,13 +112,13 @@ export class FreteService {
         await this.sql`UPDATE "Frete" SET "porcentagemMotorista" = ${updateFreteDto.porcentagemMotorista} WHERE id = ${id}`;
       }
       if (updateFreteDto.origemId !== undefined) {
-        await this.sql`UPDATE "Frete" SET "origemId" = ${updateFreteDto.origemId} WHERE id = ${id}`;
+        await this.sql`UPDATE "Frete" SET "origem" = ${updateFreteDto.origemId} WHERE id = ${id}`;
       }
       if (updateFreteDto.destinoId !== undefined) {
-        await this.sql`UPDATE "Frete" SET "destinoId" = ${updateFreteDto.destinoId} WHERE id = ${id}`;
+        await this.sql`UPDATE "Frete" SET "destino" = ${updateFreteDto.destinoId} WHERE id = ${id}`;
       }
       if (updateFreteDto.cargaId !== undefined) {
-        await this.sql`UPDATE "Frete" SET "cargaId" = ${updateFreteDto.cargaId} WHERE id = ${id}`;
+        await this.sql`UPDATE "Frete" SET "carga" = ${updateFreteDto.cargaId} WHERE id = ${id}`;
       }
       return { message: 'Frete atualizado com sucesso!' };
     } catch (error) {

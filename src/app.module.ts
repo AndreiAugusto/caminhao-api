@@ -16,6 +16,7 @@ import { JwtAuthGuard } from './auth/jwt.guard';
 import { EstadoModule } from './estado/estado.module';
 import { CidadeModule } from './cidade/cidade.module';
 import { CargaModule } from './carga/carga.module';
+import { CustoFixoModule } from './custo-fixo/custo-fixo.module';
 
 @Module({
   imports: [
@@ -32,6 +33,7 @@ import { CargaModule } from './carga/carga.module';
     EstadoModule,
     CidadeModule,
     CargaModule,
+    CustoFixoModule,
   ],
   controllers: [AppController],
   providers: [
