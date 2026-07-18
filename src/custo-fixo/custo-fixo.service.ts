@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { Injectable } from '@nestjs/common';
 import { CreateCustoFixoDto } from './dto/create-custo-fixo.dto';
 import { UpdateCustoFixoDto } from './dto/update-custo-fixo.dto';
+import { UpsertAjusteCustoFixoDto } from './dto/upsert-ajuste-custo-fixo.dto';
 
 @Injectable()
 export class CustoFixoService {
@@ -109,6 +110,48 @@ export class CustoFixoService {
     } catch (error) {
       console.error('Erro ao remover custo fixo:', error);
       return { message: 'Erro ao remover custo fixo!', error: error };
+    }
+  }
+
+  async findAjustes(custoFixoId: number) {
+    try {
+      const data = await this.sql`
+        SELECT id, "custoFixoId", ano, mes, valor
+        FROM "CustoFixoAjuste"
+        WHERE "custoFixoId" = ${custoFixoId}
+        ORDER BY ano DESC, mes DESC
+      `;
+      return data;
+    } catch (error) {
+      console.error('Erro ao buscar ajustes do custo fixo:', error);
+      return { message: 'Erro ao buscar ajustes do custo fixo!', error: error };
+    }
+  }
+
+  async upsertAjuste(custoFixoId: number, dto: UpsertAjusteCustoFixoDto) {
+    try {
+      if (!dto.ano || !dto.mes || dto.valor === undefined || dto.valor === null) {
+        return { message: 'Verifique os campos obrigatórios!' };
+      }
+      await this.sql`
+        INSERT INTO "CustoFixoAjuste" ("custoFixoId", ano, mes, valor)
+        VALUES (${custoFixoId}, ${dto.ano}, ${dto.mes}, ${dto.valor})
+        ON CONFLICT ("custoFixoId", ano, mes) DO UPDATE SET valor = EXCLUDED.valor
+      `;
+      return { message: 'Ajuste salvo com sucesso!' };
+    } catch (error) {
+      console.error('Erro ao salvar ajuste do custo fixo:', error);
+      return { message: 'Erro ao salvar ajuste do custo fixo!', error: error };
+    }
+  }
+
+  async removeAjuste(ajusteId: number) {
+    try {
+      await this.sql`DELETE FROM "CustoFixoAjuste" WHERE id = ${ajusteId}`;
+      return { message: 'Ajuste removido com sucesso!' };
+    } catch (error) {
+      console.error('Erro ao remover ajuste do custo fixo:', error);
+      return { message: 'Erro ao remover ajuste do custo fixo!', error: error };
     }
   }
 }

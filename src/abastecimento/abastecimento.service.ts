@@ -15,16 +15,17 @@ export class AbastecimentoService {
 
   async create(createAbastecimentoDto: CreateAbastecimentoDto) {
     try {
-      if (!createAbastecimentoDto.litros || !createAbastecimentoDto.custoTotal || !createAbastecimentoDto.data || !createAbastecimentoDto.caminhaoId) {
+      if (!createAbastecimentoDto.custoTotal || !createAbastecimentoDto.data || !createAbastecimentoDto.caminhaoId) {
         return { message: 'Verifique os campos obrigatórios!' };
       }
       await this.sql`
-        INSERT INTO "Abastecimento" (litros, "custoTotal", data, "caminhaoId")
+        INSERT INTO "Abastecimento" (litros, "custoTotal", data, "caminhaoId", quilometragem)
         VALUES (
-          ${createAbastecimentoDto.litros},
+          ${createAbastecimentoDto.litros ?? null},
           ${createAbastecimentoDto.custoTotal},
           ${createAbastecimentoDto.data},
-          ${createAbastecimentoDto.caminhaoId}
+          ${createAbastecimentoDto.caminhaoId},
+          ${createAbastecimentoDto.quilometragem ?? null}
         )
       `;
       return { message: 'Abastecimento registrado com sucesso!' };
@@ -77,6 +78,9 @@ export class AbastecimentoService {
       }
       if (updateAbastecimentoDto.caminhaoId !== undefined) {
         await this.sql`UPDATE "Abastecimento" SET "caminhaoId" = ${updateAbastecimentoDto.caminhaoId} WHERE id = ${id}`;
+      }
+      if (updateAbastecimentoDto.quilometragem !== undefined) {
+        await this.sql`UPDATE "Abastecimento" SET quilometragem = ${updateAbastecimentoDto.quilometragem} WHERE id = ${id}`;
       }
       return { message: 'Abastecimento atualizado com sucesso!' };
     } catch (error) {

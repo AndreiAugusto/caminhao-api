@@ -26,7 +26,7 @@ export class FreteService {
           ${createFreteDto.data},
           ${createFreteDto.caminhaoId},
           ${createFreteDto.motoristaId},
-          ${createFreteDto.porcentagemMotorista ?? 30},
+          ${createFreteDto.porcentagemMotorista ?? 12},
           ${createFreteDto.origemId ?? null},
           ${createFreteDto.destinoId ?? null},
           ${createFreteDto.cargaId ?? null}

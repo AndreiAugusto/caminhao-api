@@ -58,6 +58,14 @@ export class DashboardController {
     return this.dashboardService.resumoMes(+mes, +ano);
   }
 
+  @ApiOperation({ summary: 'Salário calculado de todos os motoristas no mês (comissão sobre os fretes)' })
+  @ApiQuery({ name: 'mes', required: true, example: 6, description: 'Mês (1-12)' })
+  @ApiQuery({ name: 'ano', required: true, example: 2025, description: 'Ano' })
+  @Get('salarios')
+  salariosMes(@Query('mes') mes: string, @Query('ano') ano: string) {
+    return this.dashboardService.salariosMes(+mes, +ano);
+  }
+
   @ApiOperation({ summary: 'Últimas movimentações (fretes, manutenções, abastecimentos)' })
   @ApiQuery({ name: 'limite', required: false, example: 10, description: 'Quantidade de registros (padrão: 10)' })
   @Get('ultimas-movimentacoes')

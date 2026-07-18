@@ -78,6 +78,29 @@ export class DashboardService {
     }
   }
 
+  async salariosMes(mes: number, ano: number) {
+    try {
+      const data = await this.sql`
+        SELECT
+          m.id AS "motoristaId",
+          m."nomeMotorista",
+          COUNT(f.id) AS "totalFretes",
+          COALESCE(SUM(f.valor), 0) AS "totalFretesBruto",
+          COALESCE(SUM(f.valor * f."porcentagemMotorista" / 100), 0) AS "totalReceber"
+        FROM "Motorista" m
+        LEFT JOIN "Frete" f
+          ON f."motoristaId" = m.id
+          AND EXTRACT(MONTH FROM f.data) = ${mes}
+          AND EXTRACT(YEAR FROM f.data) = ${ano}
+        GROUP BY m.id, m."nomeMotorista"
+        ORDER BY m."nomeMotorista"
+      `;
+      return data;
+    } catch (error) {
+      return { message: 'Erro ao calcular salários do mês!', error };
+    }
+  }
+
   async ultimasMovimentacoes(limite: number) {
     try {
       const data = await this.sql`
@@ -129,7 +152,7 @@ export class DashboardService {
 
   async resumoMes(mes: number, ano: number) {
     try {
-      const [fretes, manutencoes, abastecimentos, custosFixos] = await Promise.all([
+      const [fretes, manutencoes, abastecimentos, custosFixos, salarios] = await Promise.all([
         this.sql`
           SELECT
             COUNT(*) AS "totalFretes",
@@ -157,10 +180,17 @@ export class DashboardService {
         this.sql`
           SELECT
             COUNT(*) AS "totalCustosFixos",
-            COALESCE(SUM(valor), 0) AS "custoFixo"
-          FROM "CustoFixo"
-          WHERE "dataInicio" <= (DATE_TRUNC('month', MAKE_DATE(${ano}, ${mes}, 1)) + INTERVAL '1 month - 1 day')
-            AND ("dataFim" IS NULL OR "dataFim" >= DATE_TRUNC('month', MAKE_DATE(${ano}, ${mes}, 1)))
+            COALESCE(SUM(COALESCE(aj.valor, cf.valor)), 0) AS "custoFixo"
+          FROM "CustoFixo" cf
+          LEFT JOIN "CustoFixoAjuste" aj ON aj."custoFixoId" = cf.id AND aj.ano = ${ano} AND aj.mes = ${mes}
+          WHERE cf."dataInicio" <= (DATE_TRUNC('month', MAKE_DATE(${ano}, ${mes}, 1)) + INTERVAL '1 month - 1 day')
+            AND (cf."dataFim" IS NULL OR cf."dataFim" >= DATE_TRUNC('month', MAKE_DATE(${ano}, ${mes}, 1)))
+        `,
+        this.sql`
+          SELECT COALESCE(SUM(valor * "porcentagemMotorista" / 100), 0) AS "custoSalarios"
+          FROM "Frete"
+          WHERE EXTRACT(MONTH FROM data) = ${mes}
+            AND EXTRACT(YEAR FROM data) = ${ano}
         `,
       ]);
 
@@ -168,7 +198,8 @@ export class DashboardService {
       const custoManutencoes = Number(manutencoes[0].custoManutencoes);
       const custoAbastecimentos = Number(abastecimentos[0].custoAbastecimentos);
       const custoFixo = Number(custosFixos[0].custoFixo);
-      const saldoLiquido = receitaBruta - custoManutencoes - custoAbastecimentos - custoFixo;
+      const custoSalarios = Number(salarios[0].custoSalarios);
+      const saldoLiquido = receitaBruta - custoManutencoes - custoAbastecimentos - custoFixo - custoSalarios;
 
       return {
         mes,
@@ -188,6 +219,9 @@ export class DashboardService {
         custosFixos: {
           total: Number(custosFixos[0].totalCustosFixos),
           custo: custoFixo,
+        },
+        salarios: {
+          custo: custoSalarios,
         },
         saldoLiquido,
       };
@@ -216,6 +250,7 @@ export class DashboardService {
       const incluirAbastecimento = !tiposSet || tiposSet.has('abastecimento');
       const incluirManutencao = !tiposSet || tiposSet.has('manutencao');
       const incluirCustoFixo = !tiposSet || tiposSet.has('custo-fixo');
+      const incluirSalarios = !tiposSet || tiposSet.has('salario-motorista');
 
       const caminhaoId = filtros.caminhaoId ?? null;
       const motoristaId = filtros.motoristaId ?? null;
@@ -286,7 +321,7 @@ export class DashboardService {
             NULL::text AS motorista,
             COALESCE(cf.categoria, 'Custo Fixo') AS empresa,
             cf.descricao AS historico,
-            cf.valor AS despesas,
+            COALESCE(aj.valor, cf.valor) AS despesas,
             NULL::numeric AS receitas
           FROM "CustoFixo" cf
           LEFT JOIN "Caminhao" c ON c.id = cf."caminhaoId"
@@ -295,9 +330,32 @@ export class DashboardService {
             LEAST(DATE_TRUNC('month', COALESCE(cf."dataFim", ${dataFim}::date)), DATE_TRUNC('month', ${dataFim}::date)),
             INTERVAL '1 month'
           ) AS gs(mes)
+          LEFT JOIN "CustoFixoAjuste" aj
+            ON aj."custoFixoId" = cf.id
+            AND aj.ano = EXTRACT(YEAR FROM gs.mes)
+            AND aj.mes = EXTRACT(MONTH FROM gs.mes)
           WHERE ${incluirCustoFixo}::boolean
             AND (${caminhaoId}::int IS NULL OR cf."caminhaoId" = ${caminhaoId}::int)
             AND ${motoristaId}::int IS NULL
+
+          UNION ALL
+
+          SELECT
+            'salario-motorista' AS tipo,
+            (DATE_TRUNC('month', f.data))::date AS data,
+            NULL::text AS placa,
+            m."nomeMotorista" AS motorista,
+            NULL::text AS empresa,
+            CONCAT('Salário ', TO_CHAR(DATE_TRUNC('month', f.data), 'MM/YYYY')) AS historico,
+            SUM(f.valor * f."porcentagemMotorista" / 100) AS despesas,
+            NULL::numeric AS receitas
+          FROM "Frete" f
+          JOIN "Motorista" m ON m.id = f."motoristaId"
+          WHERE ${incluirSalarios}::boolean
+            AND f.data BETWEEN ${dataInicio}::date AND ${dataFim}::date
+            AND (${motoristaId}::int IS NULL OR f."motoristaId" = ${motoristaId}::int)
+            AND ${caminhaoId}::int IS NULL
+          GROUP BY DATE_TRUNC('month', f.data), m.id, m."nomeMotorista"
         ) extrato
         ORDER BY data DESC
       `;

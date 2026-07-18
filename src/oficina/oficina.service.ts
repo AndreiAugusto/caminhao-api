@@ -15,8 +15,8 @@ export class OficinaService {
 
   async create(createOficinaDto: CreateOficinaDto) {
     try {
-      await this.sql`INSERT INTO "Oficina" ("nomeOficina") VALUES (${createOficinaDto.nomeOficina})`;
-      return { message: 'Oficina criada com sucesso!' }; 
+      const inserted = await this.sql`INSERT INTO "Oficina" ("nomeOficina") VALUES (${createOficinaDto.nomeOficina}) RETURNING id`;
+      return { message: 'Oficina criada com sucesso!', id: inserted[0].id };
     } catch (error) {
       console.error('Erro ao criar oficina:', error);
       return { message: 'Erro ao criar oficina!', error: error };

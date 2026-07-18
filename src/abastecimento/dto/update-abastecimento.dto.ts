@@ -12,4 +12,7 @@ export class UpdateAbastecimentoDto {
 
   @ApiPropertyOptional({ example: 1 })
   caminhaoId?: number;
+
+  @ApiPropertyOptional({ example: 85400 })
+  quilometragem?: number;
 }
