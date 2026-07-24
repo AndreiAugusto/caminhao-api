@@ -17,6 +17,8 @@ import { EstadoModule } from './estado/estado.module';
 import { CidadeModule } from './cidade/cidade.module';
 import { CargaModule } from './carga/carga.module';
 import { CustoFixoModule } from './custo-fixo/custo-fixo.module';
+import { FazendaModule } from './fazenda/fazenda.module';
+import { DocumentoModule } from './documento/documento.module';
 
 @Module({
   imports: [
@@ -34,6 +36,8 @@ import { CustoFixoModule } from './custo-fixo/custo-fixo.module';
     CidadeModule,
     CargaModule,
     CustoFixoModule,
+    FazendaModule,
+    DocumentoModule,
   ],
   controllers: [AppController],
   providers: [
