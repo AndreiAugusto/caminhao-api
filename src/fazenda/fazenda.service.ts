@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { Injectable } from '@nestjs/common';
 import { CreateFazendaDto } from './dto/create-fazenda.dto';
 import { UpdateFazendaDto } from './dto/update-fazenda.dto';
+import { CreateFazendaContatoDto } from './dto/create-fazenda-contato.dto';
 
 @Injectable()
 export class FazendaService {
@@ -19,8 +20,8 @@ export class FazendaService {
         return { message: 'Verifique os campos obrigatórios!' };
       }
       const inserted = await this.sql`
-        INSERT INTO "Fazenda" (nome, cidade_id, contato)
-        VALUES (${createFazendaDto.nome}, ${createFazendaDto.cidadeId ?? null}, ${createFazendaDto.contato ?? null})
+        INSERT INTO "Fazenda" (nome, cidade_id)
+        VALUES (${createFazendaDto.nome}, ${createFazendaDto.cidadeId ?? null})
         RETURNING id
       `;
       return { message: 'Fazenda criada com sucesso!', id: inserted[0].id };
@@ -37,7 +38,6 @@ export class FazendaService {
           f.id,
           f.nome,
           f.cidade_id,
-          f.contato,
           c.nome AS "nomeCidade",
           e.sigla AS "siglaEstado"
         FROM "Fazenda" f
@@ -70,9 +70,6 @@ export class FazendaService {
       if (updateFazendaDto.cidadeId !== undefined) {
         await this.sql`UPDATE "Fazenda" SET cidade_id = ${updateFazendaDto.cidadeId ?? null} WHERE id = ${id}`;
       }
-      if (updateFazendaDto.contato !== undefined) {
-        await this.sql`UPDATE "Fazenda" SET contato = ${updateFazendaDto.contato ?? null} WHERE id = ${id}`;
-      }
       return { message: 'Fazenda atualizada com sucesso!' };
     } catch (error) {
       console.error('Erro ao atualizar fazenda:', error);
@@ -87,6 +84,48 @@ export class FazendaService {
     } catch (error) {
       console.error('Erro ao remover fazenda:', error);
       return { message: 'Erro ao remover fazenda!', error: error };
+    }
+  }
+
+  async findContatos(fazendaId: number) {
+    try {
+      const data = await this.sql`
+        SELECT id, "fazendaId", contato
+        FROM "FazendaContato"
+        WHERE "fazendaId" = ${fazendaId}
+        ORDER BY id ASC
+      `;
+      return data;
+    } catch (error) {
+      console.error('Erro ao buscar contatos da fazenda:', error);
+      return { message: 'Erro ao buscar contatos da fazenda!', error: error };
+    }
+  }
+
+  async addContato(fazendaId: number, dto: CreateFazendaContatoDto) {
+    try {
+      if (!dto.contato) {
+        return { message: 'Verifique os campos obrigatórios!' };
+      }
+      const inserted = await this.sql`
+        INSERT INTO "FazendaContato" ("fazendaId", contato)
+        VALUES (${fazendaId}, ${dto.contato})
+        RETURNING id
+      `;
+      return { message: 'Contato adicionado com sucesso!', id: inserted[0].id };
+    } catch (error) {
+      console.error('Erro ao adicionar contato da fazenda:', error);
+      return { message: 'Erro ao adicionar contato da fazenda!', error: error };
+    }
+  }
+
+  async removeContato(contatoId: number) {
+    try {
+      await this.sql`DELETE FROM "FazendaContato" WHERE id = ${contatoId}`;
+      return { message: 'Contato removido com sucesso!' };
+    } catch (error) {
+      console.error('Erro ao remover contato da fazenda:', error);
+      return { message: 'Erro ao remover contato da fazenda!', error: error };
     }
   }
 }

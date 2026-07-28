@@ -3,6 +3,7 @@ import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { FazendaService } from './fazenda.service';
 import { CreateFazendaDto } from './dto/create-fazenda.dto';
 import { UpdateFazendaDto } from './dto/update-fazenda.dto';
+import { CreateFazendaContatoDto } from './dto/create-fazenda-contato.dto';
 
 @ApiTags('fazenda')
 @ApiBearerAuth()
@@ -38,5 +39,23 @@ export class FazendaController {
   @Delete(':id')
   remove(@Param('id') id: string) {
     return this.fazendaService.remove(+id);
+  }
+
+  @ApiOperation({ summary: 'Listar contatos de uma fazenda' })
+  @Get(':id/contatos')
+  findContatos(@Param('id') id: string) {
+    return this.fazendaService.findContatos(+id);
+  }
+
+  @ApiOperation({ summary: 'Adicionar um contato a uma fazenda' })
+  @Post(':id/contatos')
+  addContato(@Param('id') id: string, @Body() dto: CreateFazendaContatoDto) {
+    return this.fazendaService.addContato(+id, dto);
+  }
+
+  @ApiOperation({ summary: 'Remover um contato de uma fazenda' })
+  @Delete('contatos/:contatoId')
+  removeContato(@Param('contatoId') contatoId: string) {
+    return this.fazendaService.removeContato(+contatoId);
   }
 }

@@ -1,10 +1,11 @@
-import { Controller, Get, Post, Body, Param, Delete, Query, UploadedFile, UseInterceptors, Res, Req } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Body, Param, Delete, Query, UploadedFile, UseInterceptors, Res, Req } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery, ApiConsumes, ApiBody } from '@nestjs/swagger';
 import type { Request, Response } from 'express';
 import { handleUpload, type HandleUploadBody } from '@vercel/blob/client';
 import { DocumentoService } from './documento.service';
 import { CreateDocumentoDto } from './dto/create-documento.dto';
+import { UpdateDocumentoDto } from './dto/update-documento.dto';
 import { ConfirmarUploadDto } from './dto/confirmar-upload.dto';
 import { Public } from '../auth/public.decorator';
 
@@ -96,6 +97,12 @@ export class DocumentoController {
       tipo,
       entidadeId: entidadeId ? +entidadeId : undefined,
     });
+  }
+
+  @ApiOperation({ summary: 'Atualizar título, categoria e/ou onde o documento está vinculado (não altera o arquivo)' })
+  @Patch(':id')
+  update(@Param('id') id: string, @Body() dto: UpdateDocumentoDto) {
+    return this.documentoService.update(+id, dto);
   }
 
   @ApiOperation({ summary: 'Baixar/visualizar o arquivo de um documento (stream autenticado, o Blob é privado)' })

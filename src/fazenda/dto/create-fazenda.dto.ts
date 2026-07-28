@@ -7,12 +7,8 @@ export class CreateFazendaDto {
   @ApiPropertyOptional({ example: 1, description: 'ID da cidade onde fica a fazenda' })
   cidadeId?: number;
 
-  @ApiPropertyOptional({ example: 'João - (65) 99999-0000', description: 'Contato (nome/telefone)' })
-  contato?: string;
-
-  constructor(nome: string, cidadeId?: number, contato?: string) {
+  constructor(nome: string, cidadeId?: number) {
     this.nome = nome;
     this.cidadeId = cidadeId;
-    this.contato = contato;
   }
 }

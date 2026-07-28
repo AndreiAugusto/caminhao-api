@@ -5,6 +5,7 @@ import { put, del, get } from '@vercel/blob';
 import { Readable } from 'stream';
 import type { Response } from 'express';
 import { CreateDocumentoDto } from './dto/create-documento.dto';
+import { UpdateDocumentoDto } from './dto/update-documento.dto';
 import { ConfirmarUploadDto } from './dto/confirmar-upload.dto';
 
 @Injectable()
@@ -114,6 +115,34 @@ export class DocumentoService {
     } catch (error) {
       console.error('Erro ao buscar documentos:', error);
       return { message: 'Erro ao buscar documentos!', error: error };
+    }
+  }
+
+  async update(id: number, dto: UpdateDocumentoDto) {
+    try {
+      if (dto.titulo) {
+        await this.sql`UPDATE "Documento" SET titulo = ${dto.titulo} WHERE id = ${id}`;
+      }
+      if (dto.categoria !== undefined) {
+        await this.sql`UPDATE "Documento" SET categoria = ${dto.categoria || null} WHERE id = ${id}`;
+      }
+      if (dto.tipo) {
+        // O "onde foi salvo" é um conjunto único (tipo + a entidade daquele tipo) —
+        // troca de tipo sempre zera os vínculos dos outros tipos, senão um
+        // documento ficaria linkado simultaneamente a um caminhão E um motorista.
+        const caminhaoId = dto.tipo === 'caminhao' && dto.caminhaoId ? Number(dto.caminhaoId) : null;
+        const motoristaId = dto.tipo === 'motorista' && dto.motoristaId ? Number(dto.motoristaId) : null;
+        const fazendaId = dto.tipo === 'fazenda' && dto.fazendaId ? Number(dto.fazendaId) : null;
+        await this.sql`
+          UPDATE "Documento"
+          SET tipo = ${dto.tipo}, "caminhaoId" = ${caminhaoId}, "motoristaId" = ${motoristaId}, "fazendaId" = ${fazendaId}
+          WHERE id = ${id}
+        `;
+      }
+      return { message: 'Documento atualizado com sucesso!' };
+    } catch (error) {
+      console.error('Erro ao atualizar documento:', error);
+      return { message: 'Erro ao atualizar documento!', error: error };
     }
   }
 
