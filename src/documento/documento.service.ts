@@ -5,6 +5,7 @@ import { put, del, get } from '@vercel/blob';
 import { Readable } from 'stream';
 import type { Response } from 'express';
 import { CreateDocumentoDto } from './dto/create-documento.dto';
+import { ConfirmarUploadDto } from './dto/confirmar-upload.dto';
 
 @Injectable()
 export class DocumentoService {
@@ -48,6 +49,40 @@ export class DocumentoService {
     } catch (error) {
       console.error('Erro ao enviar documento:', error);
       return { message: 'Erro ao enviar documento!', error: error };
+    }
+  }
+
+  /**
+   * Grava o registro do documento no banco quando o arquivo já foi
+   * enviado direto do navegador pro Vercel Blob (upload direto, sem
+   * passar pela função serverless — usado para arquivos maiores,
+   * que não caberiam no limite de 4.5MB de payload da Vercel).
+   */
+  async createFromBlob(dto: ConfirmarUploadDto) {
+    try {
+      if (!dto.titulo || !dto.tipo || !dto.url) {
+        return { message: 'Verifique os campos obrigatórios (título, tipo e arquivo)!' };
+      }
+
+      const caminhaoId = dto.caminhaoId ? Number(dto.caminhaoId) : null;
+      const motoristaId = dto.motoristaId ? Number(dto.motoristaId) : null;
+      const fazendaId = dto.fazendaId ? Number(dto.fazendaId) : null;
+
+      const inserted = await this.sql`
+        INSERT INTO "Documento"
+          (titulo, categoria, tipo, "caminhaoId", "motoristaId", "fazendaId", url, "nomeArquivo", "mimeType", tamanho)
+        VALUES (
+          ${dto.titulo}, ${dto.categoria ?? null}, ${dto.tipo},
+          ${caminhaoId}, ${motoristaId}, ${fazendaId},
+          ${dto.url}, ${dto.nomeArquivo}, ${dto.mimeType}, ${dto.tamanho}
+        )
+        RETURNING id
+      `;
+
+      return { message: 'Documento enviado com sucesso!', id: inserted[0].id, url: dto.url };
+    } catch (error) {
+      console.error('Erro ao confirmar documento enviado:', error);
+      return { message: 'Erro ao salvar documento enviado!', error: error };
     }
   }
 
