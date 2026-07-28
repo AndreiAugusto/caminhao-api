@@ -39,10 +39,14 @@ export class FazendaService {
           f.nome,
           f.cidade_id,
           c.nome AS "nomeCidade",
-          e.sigla AS "siglaEstado"
+          e.sigla AS "siglaEstado",
+          COALESCE(fc.total, 0)::int AS "totalContatos"
         FROM "Fazenda" f
         LEFT JOIN "Cidade" c ON c.id = f.cidade_id
         LEFT JOIN "Estado" e ON e.id = c.estado_id
+        LEFT JOIN (
+          SELECT "fazendaId", COUNT(*) AS total FROM "FazendaContato" GROUP BY "fazendaId"
+        ) fc ON fc."fazendaId" = f.id
         ORDER BY f.nome ASC
       `;
       return data;

@@ -50,9 +50,13 @@ export class CustoFixoService {
           cf."diaVencimento",
           cf."dataInicio",
           cf."dataFim",
-          c.placa AS "placaCaminhao"
+          c.placa AS "placaCaminhao",
+          COALESCE(cfa.total, 0)::int AS "totalAjustes"
         FROM "CustoFixo" cf
         LEFT JOIN "Caminhao" c ON c.id = cf."caminhaoId"
+        LEFT JOIN (
+          SELECT "custoFixoId", COUNT(*) AS total FROM "CustoFixoAjuste" GROUP BY "custoFixoId"
+        ) cfa ON cfa."custoFixoId" = cf.id
         ORDER BY cf."dataInicio" DESC
       `;
       return data;
