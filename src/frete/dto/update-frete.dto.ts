@@ -27,4 +27,7 @@ export class UpdateFreteDto {
 
   @ApiPropertyOptional({ example: 1, description: 'ID do tipo de carga' })
   cargaId?: number;
+
+  @ApiPropertyOptional({ example: 1, description: 'ID da fazenda de origem do frete' })
+  fazendaId?: number;
 }

@@ -19,7 +19,7 @@ export class FreteService {
         return { message: 'Verifique os campos obrigatórios!' };
       }
       await this.sql`
-        INSERT INTO "Frete" (descricao, valor, data, "caminhaoId", "motoristaId", "porcentagemMotorista", "origem", "destino", "carga")
+        INSERT INTO "Frete" (descricao, valor, data, "caminhaoId", "motoristaId", "porcentagemMotorista", "origem", "destino", "carga", "fazendaId")
         VALUES (
           ${createFreteDto.descricao ?? null},
           ${createFreteDto.valor},
@@ -29,7 +29,8 @@ export class FreteService {
           ${createFreteDto.porcentagemMotorista ?? 12},
           ${createFreteDto.origemId ?? null},
           ${createFreteDto.destinoId ?? null},
-          ${createFreteDto.cargaId ?? null}
+          ${createFreteDto.cargaId ?? null},
+          ${createFreteDto.fazendaId ?? null}
         )
       `;
       return { message: 'Frete registrado com sucesso!' };
@@ -49,13 +50,15 @@ export class FreteService {
           c.placa,
           origem.nome AS "nomeOrigem",
           destino.nome AS "nomeDestino",
-          carga.nome AS "nomeCarga"
+          carga.nome AS "nomeCarga",
+          fz.nome AS "nomeFazenda"
         FROM "Frete" f
         JOIN "Motorista" m ON m.id = f."motoristaId"
         JOIN "Caminhao" c ON c.id = f."caminhaoId"
         LEFT JOIN "Cidade" origem ON origem.id = f."origem"
         LEFT JOIN "Cidade" destino ON destino.id = f."destino"
         LEFT JOIN "Carga" carga ON carga.id = f."carga"
+        LEFT JOIN "Fazenda" fz ON fz.id = f."fazendaId"
         ORDER BY f.data DESC
       `;
       return data;
@@ -75,13 +78,15 @@ export class FreteService {
           c.placa,
           origem.nome AS "nomeOrigem",
           destino.nome AS "nomeDestino",
-          carga.nome AS "nomeCarga"
+          carga.nome AS "nomeCarga",
+          fz.nome AS "nomeFazenda"
         FROM "Frete" f
         JOIN "Motorista" m ON m.id = f."motoristaId"
         JOIN "Caminhao" c ON c.id = f."caminhaoId"
         LEFT JOIN "Cidade" origem ON origem.id = f."origem"
         LEFT JOIN "Cidade" destino ON destino.id = f."destino"
         LEFT JOIN "Carga" carga ON carga.id = f."carga"
+        LEFT JOIN "Fazenda" fz ON fz.id = f."fazendaId"
         WHERE f.id = ${id}
       `;
       return data[0] ?? null;
@@ -119,6 +124,9 @@ export class FreteService {
       }
       if (updateFreteDto.cargaId !== undefined) {
         await this.sql`UPDATE "Frete" SET "carga" = ${updateFreteDto.cargaId} WHERE id = ${id}`;
+      }
+      if (updateFreteDto.fazendaId !== undefined) {
+        await this.sql`UPDATE "Frete" SET "fazendaId" = ${updateFreteDto.fazendaId} WHERE id = ${id}`;
       }
       return { message: 'Frete atualizado com sucesso!' };
     } catch (error) {

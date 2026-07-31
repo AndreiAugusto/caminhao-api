@@ -262,13 +262,14 @@ export class DashboardService {
             f.data,
             c.placa,
             m."nomeMotorista" AS motorista,
-            NULL::text AS empresa,
+            fz.nome AS empresa,
             COALESCE(f.descricao, 'Frete') AS historico,
             NULL::numeric AS despesas,
             f.valor AS receitas
           FROM "Frete" f
           JOIN "Caminhao" c ON c.id = f."caminhaoId"
           JOIN "Motorista" m ON m.id = f."motoristaId"
+          LEFT JOIN "Fazenda" fz ON fz.id = f."fazendaId"
           WHERE ${incluirFrete}::boolean
             AND f.data BETWEEN ${dataInicio}::date AND ${dataFim}::date
             AND (${caminhaoId}::int IS NULL OR f."caminhaoId" = ${caminhaoId}::int)
