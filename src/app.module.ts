@@ -19,6 +19,7 @@ import { CargaModule } from './carga/carga.module';
 import { CustoFixoModule } from './custo-fixo/custo-fixo.module';
 import { FazendaModule } from './fazenda/fazenda.module';
 import { DocumentoModule } from './documento/documento.module';
+import { NotaModule } from './nota/nota.module';
 
 @Module({
   imports: [
@@ -38,6 +39,7 @@ import { DocumentoModule } from './documento/documento.module';
     CustoFixoModule,
     FazendaModule,
     DocumentoModule,
+    NotaModule,
   ],
   controllers: [AppController],
   providers: [

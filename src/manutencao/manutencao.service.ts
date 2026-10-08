@@ -3,12 +3,13 @@ import { ConfigService } from '@nestjs/config';
 import { Injectable } from '@nestjs/common';
 import { CreateManutencaoDto } from './dto/create-manutencao.dto';
 import { UpdateManutencaoDto } from './dto/update-manutencao.dto';
+import { NotaService } from '../nota/nota.service';
 
 @Injectable()
 export class ManutencaoService {
   private readonly sql;
 
-  constructor(private configService: ConfigService) {
+  constructor(private configService: ConfigService, private notaService: NotaService) {
       const databaseUrl = this.configService.get('DATABASE_URL');
       this.sql = neon(databaseUrl);
   }
@@ -47,7 +48,7 @@ export class ManutencaoService {
         `;
       }
 
-      return { message: 'Manutenção criada com sucesso!' };
+      return { message: 'Manutenção criada com sucesso!', id: manutencaoId };
     } catch (error) {
       console.error('Erro ao criar manutenção:', error);
       return { message: 'Erro ao criar manutenção!', error: error };
@@ -68,7 +69,8 @@ export class ManutencaoService {
           c.placa AS "placaCaminhao",
           o."nomeOficina" AS "nomeOficina",
           COALESCE(p."totalParcelas", 0) AS "totalParcelas",
-          COALESCE(p."parcelasPagas", 0) AS "parcelasPagas"
+          COALESCE(p."parcelasPagas", 0) AS "parcelasPagas",
+          (SELECT COUNT(*) FROM "Nota" n WHERE n."manutencaoId" = m.id)::int AS "totalNotas"
         FROM "Manutencao" m
         JOIN "Caminhao" c ON c.id = m."caminhaoId"
         JOIN "Oficina" o ON o.id = m."oficinaId"
@@ -148,6 +150,7 @@ export class ManutencaoService {
 
   async remove(id: number) {
     try {
+      await this.notaService.removerArquivosDe({ manutencaoId: id });
       await this.sql`DELETE FROM "Manutencao" WHERE id = ${id}`;
       return { message: 'Manutenção removida com sucesso!' };
     } catch (error) {

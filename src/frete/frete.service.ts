@@ -3,12 +3,13 @@ import { ConfigService } from '@nestjs/config';
 import { Injectable } from '@nestjs/common';
 import { CreateFreteDto } from './dto/create-frete.dto';
 import { UpdateFreteDto } from './dto/update-frete.dto';
+import { NotaService } from '../nota/nota.service';
 
 @Injectable()
 export class FreteService {
   private readonly sql;
 
-  constructor(private configService: ConfigService) {
+  constructor(private configService: ConfigService, private notaService: NotaService) {
     const databaseUrl = this.configService.get('DATABASE_URL');
     this.sql = neon(databaseUrl);
   }
@@ -18,7 +19,7 @@ export class FreteService {
       if (!createFreteDto.valor || !createFreteDto.data || !createFreteDto.caminhaoId || !createFreteDto.motoristaId) {
         return { message: 'Verifique os campos obrigatórios!' };
       }
-      await this.sql`
+      const inserted = await this.sql`
         INSERT INTO "Frete" (descricao, valor, data, "caminhaoId", "motoristaId", "porcentagemMotorista", "origem", "destino", "carga", "fazendaId")
         VALUES (
           ${createFreteDto.descricao ?? null},
@@ -32,8 +33,9 @@ export class FreteService {
           ${createFreteDto.cargaId ?? null},
           ${createFreteDto.fazendaId ?? null}
         )
+        RETURNING id
       `;
-      return { message: 'Frete registrado com sucesso!' };
+      return { message: 'Frete registrado com sucesso!', id: inserted[0].id };
     } catch (error) {
       console.error('Erro ao registrar frete:', error);
       return { message: 'Erro ao registrar frete!', error };
@@ -51,7 +53,8 @@ export class FreteService {
           origem.nome AS "nomeOrigem",
           destino.nome AS "nomeDestino",
           carga.nome AS "nomeCarga",
-          fz.nome AS "nomeFazenda"
+          fz.nome AS "nomeFazenda",
+          (SELECT COUNT(*) FROM "Nota" n WHERE n."freteId" = f.id)::int AS "totalNotas"
         FROM "Frete" f
         JOIN "Motorista" m ON m.id = f."motoristaId"
         JOIN "Caminhao" c ON c.id = f."caminhaoId"
@@ -137,6 +140,7 @@ export class FreteService {
 
   async remove(id: number) {
     try {
+      await this.notaService.removerArquivosDe({ freteId: id });
       await this.sql`DELETE FROM "Frete" WHERE id = ${id}`;
       return { message: 'Frete removido com sucesso!' };
     } catch (error) {
