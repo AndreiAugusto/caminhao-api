@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { Injectable } from '@nestjs/common';
 import { CreateAbastecimentoDto } from './dto/create-abastecimento.dto';
 import { UpdateAbastecimentoDto } from './dto/update-abastecimento.dto';
+import { vinculosDaEmpresa, VINCULO_INVALIDO } from '../empresa/vinculos';
 
 @Injectable()
 export class AbastecimentoService {
@@ -13,19 +14,23 @@ export class AbastecimentoService {
     this.sql = neon(databaseUrl);
   }
 
-  async create(createAbastecimentoDto: CreateAbastecimentoDto) {
+  async create(empresaId: number, createAbastecimentoDto: CreateAbastecimentoDto) {
     try {
       if (!createAbastecimentoDto.custoTotal || !createAbastecimentoDto.data || !createAbastecimentoDto.caminhaoId) {
         return { message: 'Verifique os campos obrigatórios!' };
       }
+      if (!(await vinculosDaEmpresa(this.sql, empresaId, createAbastecimentoDto))) {
+        return VINCULO_INVALIDO;
+      }
       await this.sql`
-        INSERT INTO "Abastecimento" (litros, "custoTotal", data, "caminhaoId", quilometragem)
+        INSERT INTO "Abastecimento" (litros, "custoTotal", data, "caminhaoId", quilometragem, "empresaId")
         VALUES (
           ${createAbastecimentoDto.litros ?? null},
           ${createAbastecimentoDto.custoTotal},
           ${createAbastecimentoDto.data},
           ${createAbastecimentoDto.caminhaoId},
-          ${createAbastecimentoDto.quilometragem ?? null}
+          ${createAbastecimentoDto.quilometragem ?? null},
+          ${empresaId}
         )
       `;
       return { message: 'Abastecimento registrado com sucesso!' };
@@ -35,12 +40,13 @@ export class AbastecimentoService {
     }
   }
 
-  async findAll() {
+  async findAll(empresaId: number) {
     try {
       const data = await this.sql`
         SELECT a.*, c.modelo AS "modeloCaminhao", c.placa
         FROM "Abastecimento" a
         JOIN "Caminhao" c ON c.id = a."caminhaoId"
+        WHERE a."empresaId" = ${empresaId}
         ORDER BY a.data DESC
       `;
       return data;
@@ -50,13 +56,13 @@ export class AbastecimentoService {
     }
   }
 
-  async findOne(id: number) {
+  async findOne(empresaId: number, id: number) {
     try {
       const data = await this.sql`
         SELECT a.*, c.modelo AS "modeloCaminhao", c.placa
         FROM "Abastecimento" a
         JOIN "Caminhao" c ON c.id = a."caminhaoId"
-        WHERE a.id = ${id}
+        WHERE a.id = ${id} AND a."empresaId" = ${empresaId}
       `;
       return data;
     } catch (error) {
@@ -65,22 +71,25 @@ export class AbastecimentoService {
     }
   }
 
-  async update(id: number, updateAbastecimentoDto: UpdateAbastecimentoDto) {
+  async update(empresaId: number, id: number, updateAbastecimentoDto: UpdateAbastecimentoDto) {
     try {
+      if (!(await vinculosDaEmpresa(this.sql, empresaId, updateAbastecimentoDto))) {
+        return VINCULO_INVALIDO;
+      }
       if (updateAbastecimentoDto.litros !== undefined) {
-        await this.sql`UPDATE "Abastecimento" SET litros = ${updateAbastecimentoDto.litros} WHERE id = ${id}`;
+        await this.sql`UPDATE "Abastecimento" SET litros = ${updateAbastecimentoDto.litros} WHERE id = ${id} AND "empresaId" = ${empresaId}`;
       }
       if (updateAbastecimentoDto.custoTotal !== undefined) {
-        await this.sql`UPDATE "Abastecimento" SET "custoTotal" = ${updateAbastecimentoDto.custoTotal} WHERE id = ${id}`;
+        await this.sql`UPDATE "Abastecimento" SET "custoTotal" = ${updateAbastecimentoDto.custoTotal} WHERE id = ${id} AND "empresaId" = ${empresaId}`;
       }
       if (updateAbastecimentoDto.data !== undefined) {
-        await this.sql`UPDATE "Abastecimento" SET data = ${updateAbastecimentoDto.data} WHERE id = ${id}`;
+        await this.sql`UPDATE "Abastecimento" SET data = ${updateAbastecimentoDto.data} WHERE id = ${id} AND "empresaId" = ${empresaId}`;
       }
       if (updateAbastecimentoDto.caminhaoId !== undefined) {
-        await this.sql`UPDATE "Abastecimento" SET "caminhaoId" = ${updateAbastecimentoDto.caminhaoId} WHERE id = ${id}`;
+        await this.sql`UPDATE "Abastecimento" SET "caminhaoId" = ${updateAbastecimentoDto.caminhaoId} WHERE id = ${id} AND "empresaId" = ${empresaId}`;
       }
       if (updateAbastecimentoDto.quilometragem !== undefined) {
-        await this.sql`UPDATE "Abastecimento" SET quilometragem = ${updateAbastecimentoDto.quilometragem} WHERE id = ${id}`;
+        await this.sql`UPDATE "Abastecimento" SET quilometragem = ${updateAbastecimentoDto.quilometragem} WHERE id = ${id} AND "empresaId" = ${empresaId}`;
       }
       return { message: 'Abastecimento atualizado com sucesso!' };
     } catch (error) {
@@ -89,9 +98,9 @@ export class AbastecimentoService {
     }
   }
 
-  async remove(id: number) {
+  async remove(empresaId: number, id: number) {
     try {
-      await this.sql`DELETE FROM "Abastecimento" WHERE id = ${id}`;
+      await this.sql`DELETE FROM "Abastecimento" WHERE id = ${id} AND "empresaId" = ${empresaId}`;
       return { message: 'Abastecimento removido com sucesso!' };
     } catch (error) {
       console.error('Erro ao remover abastecimento:', error);

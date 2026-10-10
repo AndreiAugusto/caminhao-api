@@ -12,9 +12,9 @@ export class CaminhaoService {
       const databaseUrl = this.configService.get('DATABASE_URL');
       this.sql = neon(databaseUrl);
   }
-  async create(createCaminhaoDto: CreateCaminhaoDto) {
+  async create(empresaId: number, createCaminhaoDto: CreateCaminhaoDto) {
     try {
-      await this.sql`INSERT INTO "Caminhao" (modelo, ano, placa) VALUES (${createCaminhaoDto.modelo}, ${createCaminhaoDto.ano}, ${createCaminhaoDto.placa})`;
+      await this.sql`INSERT INTO "Caminhao" (modelo, ano, placa, "empresaId") VALUES (${createCaminhaoDto.modelo}, ${createCaminhaoDto.ano}, ${createCaminhaoDto.placa}, ${empresaId})`;
       return { message: 'Caminhão criado com sucesso!' }; 
     } catch (error) {
       console.error('Erro ao criar caminhão:', error);
@@ -22,9 +22,9 @@ export class CaminhaoService {
     }
   }
 
-  async findAll() {
+  async findAll(empresaId: number) {
     try {
-        const data = await this.sql`Select * from "Caminhao"`;
+        const data = await this.sql`Select * from "Caminhao" WHERE "empresaId" = ${empresaId}`;
         return data;            
     } catch (error) {
         console.error('Erro ao buscar caminhões:', error);
@@ -32,9 +32,9 @@ export class CaminhaoService {
     }
   }
 
-  async findOne(id: number) {
+  async findOne(empresaId: number, id: number) {
     try {
-        const data = await this.sql`Select * from "Caminhao" where id = ${id}`;
+        const data = await this.sql`Select * from "Caminhao" WHERE id = ${id} AND "empresaId" = ${empresaId}`;
         return data;            
     } catch (error) {
         console.error('Erro ao buscar caminhões:', error);
@@ -42,16 +42,16 @@ export class CaminhaoService {
     }
   }
 
-  async update(id: number, updateCaminhaoDto: UpdateCaminhaoDto) {
+  async update(empresaId: number, id: number, updateCaminhaoDto: UpdateCaminhaoDto) {
     try {
         if(updateCaminhaoDto.modelo){
-            await this.sql`UPDATE "Caminhao" SET modelo = ${updateCaminhaoDto.modelo} WHERE id = ${id}`;
+            await this.sql`UPDATE "Caminhao" SET modelo = ${updateCaminhaoDto.modelo} WHERE id = ${id} AND "empresaId" = ${empresaId}`;
         }
         if(updateCaminhaoDto.ano){
-            await this.sql`UPDATE "Caminhao" SET ano = ${updateCaminhaoDto.ano} WHERE id = ${id}`;
+            await this.sql`UPDATE "Caminhao" SET ano = ${updateCaminhaoDto.ano} WHERE id = ${id} AND "empresaId" = ${empresaId}`;
         }
         if(updateCaminhaoDto.placa){
-            await this.sql`UPDATE "Caminhao" SET placa = ${updateCaminhaoDto.placa} WHERE id = ${id}`;
+            await this.sql`UPDATE "Caminhao" SET placa = ${updateCaminhaoDto.placa} WHERE id = ${id} AND "empresaId" = ${empresaId}`;
         }
         return { message: 'Caminhão atualizado com sucesso!' };
     } catch (error) {
@@ -60,9 +60,9 @@ export class CaminhaoService {
     }
   }
 
-  async remove(id: number) {
+  async remove(empresaId: number, id: number) {
     try {
-      await this.sql`DELETE FROM "Caminhao" WHERE id = ${id}`;
+      await this.sql`DELETE FROM "Caminhao" WHERE id = ${id} AND "empresaId" = ${empresaId}`;
       return { message: 'Caminhão removido com sucesso!' };
     } catch (error) {
       console.error('Erro ao remover caminhão:', error);

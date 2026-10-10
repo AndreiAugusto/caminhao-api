@@ -1,5 +1,6 @@
 import { Controller, Get, Post, Body, Patch, Param, Delete } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
+import { EmpresaId } from '../empresa/empresa.decorator';
 import { CaminhaoService } from './caminhao.service';
 import { CreateCaminhaoDto } from './dto/create-caminhao.dto';
 import { UpdateCaminhaoDto } from './dto/update-caminhao.dto';
@@ -12,31 +13,31 @@ export class CaminhaoController {
 
   @ApiOperation({ summary: 'Cadastrar caminhão' })
   @Post()
-  create(@Body() createCaminhaoDto: CreateCaminhaoDto) {
-    return this.caminhaoService.create(createCaminhaoDto);
+  create(@EmpresaId() empresaId: number, @Body() createCaminhaoDto: CreateCaminhaoDto) {
+    return this.caminhaoService.create(empresaId, createCaminhaoDto);
   }
 
   @ApiOperation({ summary: 'Listar todos os caminhões' })
   @Get()
-  findAll() {
-    return this.caminhaoService.findAll();
+  findAll(@EmpresaId() empresaId: number) {
+    return this.caminhaoService.findAll(empresaId);
   }
 
   @ApiOperation({ summary: 'Buscar caminhão por ID' })
   @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.caminhaoService.findOne(+id);
+  findOne(@EmpresaId() empresaId: number, @Param('id') id: string) {
+    return this.caminhaoService.findOne(empresaId, +id);
   }
 
   @ApiOperation({ summary: 'Atualizar caminhão' })
   @Patch(':id')
-  update(@Param('id') id: string, @Body() updateCaminhaoDto: UpdateCaminhaoDto) {
-    return this.caminhaoService.update(+id, updateCaminhaoDto);
+  update(@EmpresaId() empresaId: number, @Param('id') id: string, @Body() updateCaminhaoDto: UpdateCaminhaoDto) {
+    return this.caminhaoService.update(empresaId, +id, updateCaminhaoDto);
   }
 
   @ApiOperation({ summary: 'Remover caminhão' })
   @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.caminhaoService.remove(+id);
+  remove(@EmpresaId() empresaId: number, @Param('id') id: string) {
+    return this.caminhaoService.remove(empresaId, +id);
   }
 }

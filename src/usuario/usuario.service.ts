@@ -13,16 +13,6 @@ export class UsuarioService {
         const databaseUrl = this.configService.get('DATABASE_URL');
         this.sql = neon(databaseUrl);
     }
-    async getTableUsuario() {
-        try {
-            const data = await this.sql`Select * from usuario`;
-            return data;            
-        } catch (error) {
-            console.error('Erro ao buscar tabela de usuários:', error);
-            return { message: 'Erro ao buscar tabela de usuários!', error: error };
-        }
-    }
-    
     async findOne(id: number) {
         try {
             const data = await this.sql`Select * from usuario where id = ${id}`;
@@ -45,7 +35,15 @@ export class UsuarioService {
 
     async createUsuario(createUsuarioDto: CreateUsuarioDto){
         try {
-            await this.sql`INSERT INTO usuario (nome, email, senha) VALUES (${createUsuarioDto.nome}, ${createUsuarioDto.email}, ${createUsuarioDto.senha})`;
+            // Todo cadastro novo cria a sua própria empresa (num único comando,
+            // pra não sobrar empresa órfã se o INSERT do usuário falhar).
+            await this.sql`
+                WITH empresa AS (
+                    INSERT INTO "Empresa" (nome) VALUES (${createUsuarioDto.nome}) RETURNING id
+                )
+                INSERT INTO usuario (nome, email, senha, "empresaId")
+                SELECT ${createUsuarioDto.nome}, ${createUsuarioDto.email}, ${createUsuarioDto.senha}, id FROM empresa
+            `;
             return { message: 'Usuário criado com sucesso!' };
         } catch (error) {
             console.error('Erro ao criar usuário:', error);

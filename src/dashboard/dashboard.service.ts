@@ -11,52 +11,52 @@ export class DashboardService {
     this.sql = neon(databaseUrl);
   }
 
-  async manutencaoCount() {
+  async manutencaoCount(empresaId: number) {
     try {
-      const data = await this.sql`SELECT COUNT(*) FROM "Manutencao"`;
+      const data = await this.sql`SELECT COUNT(*) FROM "Manutencao" WHERE "empresaId" = ${empresaId}`;
       return data[0].count;
     } catch (error) {
       return { message: 'Erro ao contar manutenções!', error };
     }
   }
 
-  async oficinaCount() {
+  async oficinaCount(empresaId: number) {
     try {
-      const data = await this.sql`SELECT COUNT(*) FROM "Oficina"`;
+      const data = await this.sql`SELECT COUNT(*) FROM "Oficina" WHERE "empresaId" = ${empresaId}`;
       return data[0].count;
     } catch (error) {
       return { message: 'Erro ao contar oficinas!', error };
     }
   }
 
-  async oficinaCountOne(id: number) {
+  async oficinaCountOne(empresaId: number, id: number) {
     try {
-      const data = await this.sql`SELECT COUNT(*) FROM "Manutencao" WHERE "oficinaId" = ${id}`;
+      const data = await this.sql`SELECT COUNT(*) FROM "Manutencao" WHERE "oficinaId" = ${id} AND "empresaId" = ${empresaId}`;
       return data[0].count;
     } catch (error) {
       return { message: 'Erro ao contar manutenções de oficina!', error };
     }
   }
 
-  async caminhaoCount() {
+  async caminhaoCount(empresaId: number) {
     try {
-      const data = await this.sql`SELECT COUNT(*) FROM "Caminhao"`;
+      const data = await this.sql`SELECT COUNT(*) FROM "Caminhao" WHERE "empresaId" = ${empresaId}`;
       return data[0].count;
     } catch (error) {
       return { message: 'Erro ao contar caminhões!', error };
     }
   }
 
-  async caminhaoCountOne(id: number) {
+  async caminhaoCountOne(empresaId: number, id: number) {
     try {
-      const data = await this.sql`SELECT COUNT(*) FROM "Manutencao" WHERE "caminhaoId" = ${id}`;
+      const data = await this.sql`SELECT COUNT(*) FROM "Manutencao" WHERE "caminhaoId" = ${id} AND "empresaId" = ${empresaId}`;
       return data[0].count;
     } catch (error) {
       return { message: 'Erro ao contar manutenções de caminhão!', error };
     }
   }
 
-  async motoristaPagamento(id: number, mes: number, ano: number) {
+  async motoristaPagamento(empresaId: number, id: number, mes: number, ano: number) {
     try {
       const data = await this.sql`
         SELECT
@@ -69,7 +69,7 @@ export class DashboardService {
           ON f."motoristaId" = m.id
           AND EXTRACT(MONTH FROM f.data) = ${mes}
           AND EXTRACT(YEAR FROM f.data) = ${ano}
-        WHERE m.id = ${id}
+        WHERE m.id = ${id} AND m."empresaId" = ${empresaId}
         GROUP BY m.id, m."nomeMotorista"
       `;
       return data[0] ?? null;
@@ -78,7 +78,7 @@ export class DashboardService {
     }
   }
 
-  async salariosMes(mes: number, ano: number) {
+  async salariosMes(empresaId: number, mes: number, ano: number) {
     try {
       const data = await this.sql`
         SELECT
@@ -86,12 +86,35 @@ export class DashboardService {
           m."nomeMotorista",
           COUNT(f.id) AS "totalFretes",
           COALESCE(SUM(f.valor), 0) AS "totalFretesBruto",
-          COALESCE(SUM(f.valor * f."porcentagemMotorista" / 100), 0) AS "totalReceber"
+          COALESCE(SUM(f.valor * f."porcentagemMotorista" / 100), 0) AS "totalReceber",
+          COALESCE(MAX(desconto.total), 0) AS "totalAdiantamentos",
+          COALESCE(SUM(f.valor * f."porcentagemMotorista" / 100), 0) - COALESCE(MAX(desconto.total), 0) AS "saldoPagar",
+          COALESCE(MAX(adiantado.total), 0) AS "adiantadoNoMes",
+          COALESCE(SUM(f.valor * f."porcentagemMotorista" / 100), 0) - COALESCE(MAX(desconto.total), 0)
+            + COALESCE(MAX(adiantado.total), 0) AS "totalMes"
         FROM "Motorista" m
         LEFT JOIN "Frete" f
           ON f."motoristaId" = m.id
           AND EXTRACT(MONTH FROM f.data) = ${mes}
           AND EXTRACT(YEAR FROM f.data) = ${ano}
+        -- parcelas de adiantamentos descontadas do salário deste mês
+        LEFT JOIN (
+          SELECT a."motoristaId", SUM(ap.valor) AS total
+          FROM "AdiantamentoParcela" ap
+          JOIN "Adiantamento" a ON a.id = ap."adiantamentoId"
+          WHERE a."empresaId" = ${empresaId} AND ap.mes = ${mes} AND ap.ano = ${ano}
+          GROUP BY a."motoristaId"
+        ) desconto ON desconto."motoristaId" = m.id
+        -- adiantamentos entregues neste mês (saem do caixa agora, descontam depois)
+        LEFT JOIN (
+          SELECT "motoristaId", SUM(valor) AS total
+          FROM "Adiantamento"
+          WHERE "empresaId" = ${empresaId}
+            AND EXTRACT(MONTH FROM data) = ${mes}
+            AND EXTRACT(YEAR FROM data) = ${ano}
+          GROUP BY "motoristaId"
+        ) adiantado ON adiantado."motoristaId" = m.id
+        WHERE m."empresaId" = ${empresaId}
         GROUP BY m.id, m."nomeMotorista"
         ORDER BY m."nomeMotorista"
       `;
@@ -101,7 +124,7 @@ export class DashboardService {
     }
   }
 
-  async ultimasMovimentacoes(limite: number) {
+  async ultimasMovimentacoes(empresaId: number, limite: number) {
     try {
       const data = await this.sql`
         SELECT * FROM (
@@ -116,6 +139,7 @@ export class DashboardService {
           JOIN "Caminhao" c ON c.id = f."caminhaoId"
           LEFT JOIN "Cidade" origem ON origem.id = f.origem
           LEFT JOIN "Cidade" destino ON destino.id = f.destino
+          WHERE f."empresaId" = ${empresaId}
 
           UNION ALL
 
@@ -128,6 +152,7 @@ export class DashboardService {
             c.placa AS "identificador"
           FROM "Manutencao" m
           JOIN "Caminhao" c ON c.id = m."caminhaoId"
+          WHERE m."empresaId" = ${empresaId}
 
           UNION ALL
 
@@ -140,6 +165,7 @@ export class DashboardService {
             c.placa AS "identificador"
           FROM "Abastecimento" a
           JOIN "Caminhao" c ON c.id = a."caminhaoId"
+          WHERE a."empresaId" = ${empresaId}
         ) movimentacoes
         ORDER BY data DESC
         LIMIT ${limite}
@@ -150,7 +176,7 @@ export class DashboardService {
     }
   }
 
-  async resumoMes(mes: number, ano: number) {
+  async resumoMes(empresaId: number, mes: number, ano: number) {
     try {
       const [fretes, manutencoes, abastecimentos, custosFixos, salarios] = await Promise.all([
         this.sql`
@@ -158,7 +184,8 @@ export class DashboardService {
             COUNT(*) AS "totalFretes",
             COALESCE(SUM(valor), 0) AS "receitaBruta"
           FROM "Frete"
-          WHERE EXTRACT(MONTH FROM data) = ${mes}
+          WHERE "empresaId" = ${empresaId}
+            AND EXTRACT(MONTH FROM data) = ${mes}
             AND EXTRACT(YEAR FROM data) = ${ano}
         `,
         this.sql`
@@ -166,7 +193,9 @@ export class DashboardService {
             COUNT(*) AS "totalManutencoes",
             COALESCE(SUM(mp.valor), 0) AS "custoManutencoes"
           FROM "ManutencaoParcela" mp
-          WHERE EXTRACT(MONTH FROM mp."dataVencimento") = ${mes}
+          JOIN "Manutencao" m ON m.id = mp."manutencaoId"
+          WHERE m."empresaId" = ${empresaId}
+            AND EXTRACT(MONTH FROM mp."dataVencimento") = ${mes}
             AND EXTRACT(YEAR FROM mp."dataVencimento") = ${ano}
         `,
         this.sql`
@@ -174,7 +203,8 @@ export class DashboardService {
             COUNT(*) AS "totalAbastecimentos",
             COALESCE(SUM("custoTotal"), 0) AS "custoAbastecimentos"
           FROM "Abastecimento"
-          WHERE EXTRACT(MONTH FROM data) = ${mes}
+          WHERE "empresaId" = ${empresaId}
+            AND EXTRACT(MONTH FROM data) = ${mes}
             AND EXTRACT(YEAR FROM data) = ${ano}
         `,
         this.sql`
@@ -183,13 +213,15 @@ export class DashboardService {
             COALESCE(SUM(COALESCE(aj.valor, cf.valor)), 0) AS "custoFixo"
           FROM "CustoFixo" cf
           LEFT JOIN "CustoFixoAjuste" aj ON aj."custoFixoId" = cf.id AND aj.ano = ${ano} AND aj.mes = ${mes}
-          WHERE cf."dataInicio" <= (DATE_TRUNC('month', MAKE_DATE(${ano}, ${mes}, 1)) + INTERVAL '1 month - 1 day')
+          WHERE cf."empresaId" = ${empresaId}
+            AND cf."dataInicio" <= (DATE_TRUNC('month', MAKE_DATE(${ano}, ${mes}, 1)) + INTERVAL '1 month - 1 day')
             AND (cf."dataFim" IS NULL OR cf."dataFim" >= DATE_TRUNC('month', MAKE_DATE(${ano}, ${mes}, 1)))
         `,
         this.sql`
           SELECT COALESCE(SUM(valor * "porcentagemMotorista" / 100), 0) AS "custoSalarios"
           FROM "Frete"
-          WHERE EXTRACT(MONTH FROM data) = ${mes}
+          WHERE "empresaId" = ${empresaId}
+            AND EXTRACT(MONTH FROM data) = ${mes}
             AND EXTRACT(YEAR FROM data) = ${ano}
         `,
       ]);
@@ -230,7 +262,7 @@ export class DashboardService {
     }
   }
 
-  async extrato(filtros: {
+  async extrato(empresaId: number, filtros: {
     dataInicio?: string;
     dataFim?: string;
     tipos?: string[];
@@ -251,6 +283,8 @@ export class DashboardService {
       const incluirManutencao = !tiposSet || tiposSet.has('manutencao');
       const incluirCustoFixo = !tiposSet || tiposSet.has('custo-fixo');
       const incluirSalarios = !tiposSet || tiposSet.has('salario-motorista');
+      // 'adiantamento' traz a entrega (despesa) e as parcelas descontadas (informativas).
+      const incluirAdiantamentos = !tiposSet || tiposSet.has('adiantamento');
 
       const caminhaoId = filtros.caminhaoId ?? null;
       const motoristaId = filtros.motoristaId ?? null;
@@ -265,12 +299,14 @@ export class DashboardService {
             fz.nome AS empresa,
             COALESCE(f.descricao, 'Frete') AS historico,
             NULL::numeric AS despesas,
-            f.valor AS receitas
+            f.valor AS receitas,
+            NULL::float8 AS "descontoAdiantamento"
           FROM "Frete" f
           JOIN "Caminhao" c ON c.id = f."caminhaoId"
           JOIN "Motorista" m ON m.id = f."motoristaId"
           LEFT JOIN "Fazenda" fz ON fz.id = f."fazendaId"
           WHERE ${incluirFrete}::boolean
+            AND f."empresaId" = ${empresaId}
             AND f.data BETWEEN ${dataInicio}::date AND ${dataFim}::date
             AND (${caminhaoId}::int IS NULL OR f."caminhaoId" = ${caminhaoId}::int)
             AND (${motoristaId}::int IS NULL OR f."motoristaId" = ${motoristaId}::int)
@@ -285,10 +321,12 @@ export class DashboardService {
             NULL::text AS empresa,
             CONCAT(a.litros, ' litros') AS historico,
             a."custoTotal" AS despesas,
-            NULL::numeric AS receitas
+            NULL::numeric AS receitas,
+            NULL::float8 AS "descontoAdiantamento"
           FROM "Abastecimento" a
           JOIN "Caminhao" c ON c.id = a."caminhaoId"
           WHERE ${incluirAbastecimento}::boolean
+            AND a."empresaId" = ${empresaId}
             AND a.data BETWEEN ${dataInicio}::date AND ${dataFim}::date
             AND (${caminhaoId}::int IS NULL OR a."caminhaoId" = ${caminhaoId}::int)
             AND ${motoristaId}::int IS NULL
@@ -303,12 +341,14 @@ export class DashboardService {
             o."nomeOficina" AS empresa,
             COALESCE(m.descricao, 'Manutenção') AS historico,
             mp.valor AS despesas,
-            NULL::numeric AS receitas
+            NULL::numeric AS receitas,
+            NULL::float8 AS "descontoAdiantamento"
           FROM "ManutencaoParcela" mp
           JOIN "Manutencao" m ON m.id = mp."manutencaoId"
           JOIN "Caminhao" c ON c.id = m."caminhaoId"
           JOIN "Oficina" o ON o.id = m."oficinaId"
           WHERE ${incluirManutencao}::boolean
+            AND m."empresaId" = ${empresaId}
             AND mp."dataVencimento" BETWEEN ${dataInicio}::date AND ${dataFim}::date
             AND (${caminhaoId}::int IS NULL OR m."caminhaoId" = ${caminhaoId}::int)
             AND ${motoristaId}::int IS NULL
@@ -323,7 +363,8 @@ export class DashboardService {
             COALESCE(cf.categoria, 'Custo Fixo') AS empresa,
             cf.descricao AS historico,
             COALESCE(aj.valor, cf.valor) AS despesas,
-            NULL::numeric AS receitas
+            NULL::numeric AS receitas,
+            NULL::float8 AS "descontoAdiantamento"
           FROM "CustoFixo" cf
           LEFT JOIN "Caminhao" c ON c.id = cf."caminhaoId"
           CROSS JOIN LATERAL generate_series(
@@ -336,27 +377,110 @@ export class DashboardService {
             AND aj.ano = EXTRACT(YEAR FROM gs.mes)
             AND aj.mes = EXTRACT(MONTH FROM gs.mes)
           WHERE ${incluirCustoFixo}::boolean
+            AND cf."empresaId" = ${empresaId}
             AND (${caminhaoId}::int IS NULL OR cf."caminhaoId" = ${caminhaoId}::int)
             AND ${motoristaId}::int IS NULL
 
           UNION ALL
 
+          -- Salário líquido: comissão do mês menos as parcelas de adiantamento
+          -- descontadas nele (o adiantamento já saiu como despesa na data em que foi entregue).
           SELECT
             'salario-motorista' AS tipo,
-            (DATE_TRUNC('month', f.data))::date AS data,
+            sal.mes AS data,
+            NULL::text AS placa,
+            sal."nomeMotorista" AS motorista,
+            NULL::text AS empresa,
+            CONCAT('Salário ', TO_CHAR(sal.mes, 'MM/YYYY')) AS historico,
+            GREATEST(sal.comissao - COALESCE(desconto.total, 0), 0)::float8 AS despesas,
+            NULL::numeric AS receitas,
+            desconto.total::float8 AS "descontoAdiantamento"
+          FROM (
+            SELECT
+              (DATE_TRUNC('month', f.data))::date AS mes,
+              m.id AS "motoristaId",
+              m."nomeMotorista",
+              SUM(f.valor * f."porcentagemMotorista" / 100) AS comissao
+            FROM "Frete" f
+            JOIN "Motorista" m ON m.id = f."motoristaId"
+            WHERE ${incluirSalarios}::boolean
+              AND f."empresaId" = ${empresaId}
+              AND f.data BETWEEN ${dataInicio}::date AND ${dataFim}::date
+              AND (${motoristaId}::int IS NULL OR f."motoristaId" = ${motoristaId}::int)
+              AND ${caminhaoId}::int IS NULL
+            GROUP BY DATE_TRUNC('month', f.data), m.id, m."nomeMotorista"
+          ) sal
+          LEFT JOIN (
+            SELECT a."motoristaId", MAKE_DATE(ap.ano, ap.mes, 1) AS mes, SUM(ap.valor) AS total
+            FROM "AdiantamentoParcela" ap
+            JOIN "Adiantamento" a ON a.id = ap."adiantamentoId"
+            WHERE a."empresaId" = ${empresaId}
+            GROUP BY a."motoristaId", ap.ano, ap.mes
+          ) desconto ON desconto."motoristaId" = sal."motoristaId" AND desconto.mes = sal.mes
+
+          UNION ALL
+
+          -- Adiantamento: sai do caixa na data em que foi entregue.
+          SELECT
+            'adiantamento' AS tipo,
+            a.data,
             NULL::text AS placa,
             m."nomeMotorista" AS motorista,
             NULL::text AS empresa,
-            CONCAT('Salário ', TO_CHAR(DATE_TRUNC('month', f.data), 'MM/YYYY')) AS historico,
-            SUM(f.valor * f."porcentagemMotorista" / 100) AS despesas,
-            NULL::numeric AS receitas
-          FROM "Frete" f
-          JOIN "Motorista" m ON m.id = f."motoristaId"
-          WHERE ${incluirSalarios}::boolean
-            AND f.data BETWEEN ${dataInicio}::date AND ${dataFim}::date
-            AND (${motoristaId}::int IS NULL OR f."motoristaId" = ${motoristaId}::int)
+            CONCAT(
+              'Adiantamento de salário — desconto ',
+              CASE
+                WHEN p.qtd > 1 THEN CONCAT('em ', p.qtd, 'x (', TO_CHAR(p.inicio, 'MM/YYYY'), ' a ', TO_CHAR(p.fim, 'MM/YYYY'), ')')
+                ELSE CONCAT('no salário ', TO_CHAR(p.inicio, 'MM/YYYY'))
+              END,
+              CASE WHEN a.observacao IS NOT NULL THEN CONCAT(' — ', a.observacao) ELSE '' END
+            ) AS historico,
+            a.valor::float8 AS despesas,
+            NULL::numeric AS receitas,
+            NULL::float8 AS "descontoAdiantamento"
+          FROM "Adiantamento" a
+          JOIN "Motorista" m ON m.id = a."motoristaId"
+          CROSS JOIN LATERAL (
+            SELECT COUNT(*) AS qtd, MIN(MAKE_DATE(ano, mes, 1)) AS inicio, MAX(MAKE_DATE(ano, mes, 1)) AS fim
+            FROM "AdiantamentoParcela"
+            WHERE "adiantamentoId" = a.id
+          ) p
+          WHERE ${incluirAdiantamentos}::boolean
+            AND a."empresaId" = ${empresaId}
+            AND a.data BETWEEN ${dataInicio}::date AND ${dataFim}::date
+            AND (${motoristaId}::int IS NULL OR a."motoristaId" = ${motoristaId}::int)
             AND ${caminhaoId}::int IS NULL
-          GROUP BY DATE_TRUNC('month', f.data), m.id, m."nomeMotorista"
+
+          UNION ALL
+
+          -- Parcela descontada do salário: só informativa (o valor já está
+          -- abatido na linha do salário), por isso não tem despesa/receita.
+          SELECT
+            'desconto-adiantamento' AS tipo,
+            MAKE_DATE(ap.ano, ap.mes, 1) AS data,
+            NULL::text AS placa,
+            m."nomeMotorista" AS motorista,
+            NULL::text AS empresa,
+            CONCAT(
+              'Desconto do adiantamento de ', TO_CHAR(a.data, 'DD/MM/YYYY'),
+              CASE
+                WHEN (SELECT COUNT(*) FROM "AdiantamentoParcela" x WHERE x."adiantamentoId" = a.id) > 1
+                THEN CONCAT(' (parcela ', ap.numero, '/', (SELECT COUNT(*) FROM "AdiantamentoParcela" x WHERE x."adiantamentoId" = a.id), ')')
+                ELSE ''
+              END,
+              ' no salário ', TO_CHAR(MAKE_DATE(ap.ano, ap.mes, 1), 'MM/YYYY')
+            ) AS historico,
+            NULL::float8 AS despesas,
+            NULL::numeric AS receitas,
+            ap.valor::float8 AS "descontoAdiantamento"
+          FROM "AdiantamentoParcela" ap
+          JOIN "Adiantamento" a ON a.id = ap."adiantamentoId"
+          JOIN "Motorista" m ON m.id = a."motoristaId"
+          WHERE ${incluirAdiantamentos}::boolean
+            AND a."empresaId" = ${empresaId}
+            AND MAKE_DATE(ap.ano, ap.mes, 1) BETWEEN DATE_TRUNC('month', ${dataInicio}::date) AND ${dataFim}::date
+            AND (${motoristaId}::int IS NULL OR a."motoristaId" = ${motoristaId}::int)
+            AND ${caminhaoId}::int IS NULL
         ) extrato
         ORDER BY data DESC
       `;

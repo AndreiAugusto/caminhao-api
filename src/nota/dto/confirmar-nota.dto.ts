@@ -1,11 +1,14 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class ConfirmarNotaDto {
-  @ApiPropertyOptional({ example: 1, description: 'ID do frete (informe este OU manutencaoId)' })
+  @ApiPropertyOptional({ example: 1, description: 'ID do frete (informe só um dos vínculos)' })
   freteId?: number;
 
-  @ApiPropertyOptional({ example: 1, description: 'ID da manutenção (informe este OU freteId)' })
+  @ApiPropertyOptional({ example: 1, description: 'ID da manutenção (informe só um dos vínculos)' })
   manutencaoId?: number;
+
+  @ApiPropertyOptional({ example: 1, description: 'ID do adiantamento (informe só um dos vínculos)' })
+  adiantamentoId?: number;
 
   @ApiProperty({ description: 'URL do blob já enviado direto ao Vercel Blob' })
   url: string;

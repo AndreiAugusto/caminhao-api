@@ -1,5 +1,6 @@
 import { Controller, Get, Post, Body, Patch, Param, Delete } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
+import { EmpresaId } from '../empresa/empresa.decorator';
 import { FreteService } from './frete.service';
 import { CreateFreteDto } from './dto/create-frete.dto';
 import { UpdateFreteDto } from './dto/update-frete.dto';
@@ -12,31 +13,31 @@ export class FreteController {
 
   @ApiOperation({ summary: 'Registrar frete' })
   @Post()
-  create(@Body() createFreteDto: CreateFreteDto) {
-    return this.freteService.create(createFreteDto);
+  create(@EmpresaId() empresaId: number, @Body() createFreteDto: CreateFreteDto) {
+    return this.freteService.create(empresaId, createFreteDto);
   }
 
   @ApiOperation({ summary: 'Listar todos os fretes (com dados do motorista e caminhão)' })
   @Get()
-  findAll() {
-    return this.freteService.findAll();
+  findAll(@EmpresaId() empresaId: number) {
+    return this.freteService.findAll(empresaId);
   }
 
   @ApiOperation({ summary: 'Buscar frete por ID' })
   @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.freteService.findOne(+id);
+  findOne(@EmpresaId() empresaId: number, @Param('id') id: string) {
+    return this.freteService.findOne(empresaId, +id);
   }
 
   @ApiOperation({ summary: 'Atualizar frete' })
   @Patch(':id')
-  update(@Param('id') id: string, @Body() updateFreteDto: UpdateFreteDto) {
-    return this.freteService.update(+id, updateFreteDto);
+  update(@EmpresaId() empresaId: number, @Param('id') id: string, @Body() updateFreteDto: UpdateFreteDto) {
+    return this.freteService.update(empresaId, +id, updateFreteDto);
   }
 
   @ApiOperation({ summary: 'Remover frete' })
   @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.freteService.remove(+id);
+  remove(@EmpresaId() empresaId: number, @Param('id') id: string) {
+    return this.freteService.remove(empresaId, +id);
   }
 }

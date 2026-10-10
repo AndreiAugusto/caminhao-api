@@ -4,6 +4,7 @@ import { Injectable } from '@nestjs/common';
 import { CreateFreteDto } from './dto/create-frete.dto';
 import { UpdateFreteDto } from './dto/update-frete.dto';
 import { NotaService } from '../nota/nota.service';
+import { vinculosDaEmpresa, VINCULO_INVALIDO } from '../empresa/vinculos';
 
 @Injectable()
 export class FreteService {
@@ -14,13 +15,16 @@ export class FreteService {
     this.sql = neon(databaseUrl);
   }
 
-  async create(createFreteDto: CreateFreteDto) {
+  async create(empresaId: number, createFreteDto: CreateFreteDto) {
     try {
       if (!createFreteDto.valor || !createFreteDto.data || !createFreteDto.caminhaoId || !createFreteDto.motoristaId) {
         return { message: 'Verifique os campos obrigatórios!' };
       }
+      if (!(await vinculosDaEmpresa(this.sql, empresaId, createFreteDto))) {
+        return VINCULO_INVALIDO;
+      }
       const inserted = await this.sql`
-        INSERT INTO "Frete" (descricao, valor, data, "caminhaoId", "motoristaId", "porcentagemMotorista", "origem", "destino", "carga", "fazendaId")
+        INSERT INTO "Frete" (descricao, valor, data, "caminhaoId", "motoristaId", "porcentagemMotorista", "origem", "destino", "carga", "fazendaId", "empresaId")
         VALUES (
           ${createFreteDto.descricao ?? null},
           ${createFreteDto.valor},
@@ -31,7 +35,8 @@ export class FreteService {
           ${createFreteDto.origemId ?? null},
           ${createFreteDto.destinoId ?? null},
           ${createFreteDto.cargaId ?? null},
-          ${createFreteDto.fazendaId ?? null}
+          ${createFreteDto.fazendaId ?? null},
+          ${empresaId}
         )
         RETURNING id
       `;
@@ -42,7 +47,7 @@ export class FreteService {
     }
   }
 
-  async findAll() {
+  async findAll(empresaId: number) {
     try {
       const data = await this.sql`
         SELECT
@@ -62,6 +67,7 @@ export class FreteService {
         LEFT JOIN "Cidade" destino ON destino.id = f."destino"
         LEFT JOIN "Carga" carga ON carga.id = f."carga"
         LEFT JOIN "Fazenda" fz ON fz.id = f."fazendaId"
+        WHERE f."empresaId" = ${empresaId}
         ORDER BY f.data DESC
       `;
       return data;
@@ -71,7 +77,7 @@ export class FreteService {
     }
   }
 
-  async findOne(id: number) {
+  async findOne(empresaId: number, id: number) {
     try {
       const data = await this.sql`
         SELECT
@@ -90,7 +96,7 @@ export class FreteService {
         LEFT JOIN "Cidade" destino ON destino.id = f."destino"
         LEFT JOIN "Carga" carga ON carga.id = f."carga"
         LEFT JOIN "Fazenda" fz ON fz.id = f."fazendaId"
-        WHERE f.id = ${id}
+        WHERE f.id = ${id} AND f."empresaId" = ${empresaId}
       `;
       return data[0] ?? null;
     } catch (error) {
@@ -99,37 +105,40 @@ export class FreteService {
     }
   }
 
-  async update(id: number, updateFreteDto: UpdateFreteDto) {
+  async update(empresaId: number, id: number, updateFreteDto: UpdateFreteDto) {
     try {
+      if (!(await vinculosDaEmpresa(this.sql, empresaId, updateFreteDto))) {
+        return VINCULO_INVALIDO;
+      }
       if (updateFreteDto.descricao !== undefined) {
-        await this.sql`UPDATE "Frete" SET descricao = ${updateFreteDto.descricao} WHERE id = ${id}`;
+        await this.sql`UPDATE "Frete" SET descricao = ${updateFreteDto.descricao} WHERE id = ${id} AND "empresaId" = ${empresaId}`;
       }
       if (updateFreteDto.valor !== undefined) {
-        await this.sql`UPDATE "Frete" SET valor = ${updateFreteDto.valor} WHERE id = ${id}`;
+        await this.sql`UPDATE "Frete" SET valor = ${updateFreteDto.valor} WHERE id = ${id} AND "empresaId" = ${empresaId}`;
       }
       if (updateFreteDto.data !== undefined) {
-        await this.sql`UPDATE "Frete" SET data = ${updateFreteDto.data} WHERE id = ${id}`;
+        await this.sql`UPDATE "Frete" SET data = ${updateFreteDto.data} WHERE id = ${id} AND "empresaId" = ${empresaId}`;
       }
       if (updateFreteDto.caminhaoId !== undefined) {
-        await this.sql`UPDATE "Frete" SET "caminhaoId" = ${updateFreteDto.caminhaoId} WHERE id = ${id}`;
+        await this.sql`UPDATE "Frete" SET "caminhaoId" = ${updateFreteDto.caminhaoId} WHERE id = ${id} AND "empresaId" = ${empresaId}`;
       }
       if (updateFreteDto.motoristaId !== undefined) {
-        await this.sql`UPDATE "Frete" SET "motoristaId" = ${updateFreteDto.motoristaId} WHERE id = ${id}`;
+        await this.sql`UPDATE "Frete" SET "motoristaId" = ${updateFreteDto.motoristaId} WHERE id = ${id} AND "empresaId" = ${empresaId}`;
       }
       if (updateFreteDto.porcentagemMotorista !== undefined) {
-        await this.sql`UPDATE "Frete" SET "porcentagemMotorista" = ${updateFreteDto.porcentagemMotorista} WHERE id = ${id}`;
+        await this.sql`UPDATE "Frete" SET "porcentagemMotorista" = ${updateFreteDto.porcentagemMotorista} WHERE id = ${id} AND "empresaId" = ${empresaId}`;
       }
       if (updateFreteDto.origemId !== undefined) {
-        await this.sql`UPDATE "Frete" SET "origem" = ${updateFreteDto.origemId} WHERE id = ${id}`;
+        await this.sql`UPDATE "Frete" SET "origem" = ${updateFreteDto.origemId} WHERE id = ${id} AND "empresaId" = ${empresaId}`;
       }
       if (updateFreteDto.destinoId !== undefined) {
-        await this.sql`UPDATE "Frete" SET "destino" = ${updateFreteDto.destinoId} WHERE id = ${id}`;
+        await this.sql`UPDATE "Frete" SET "destino" = ${updateFreteDto.destinoId} WHERE id = ${id} AND "empresaId" = ${empresaId}`;
       }
       if (updateFreteDto.cargaId !== undefined) {
-        await this.sql`UPDATE "Frete" SET "carga" = ${updateFreteDto.cargaId} WHERE id = ${id}`;
+        await this.sql`UPDATE "Frete" SET "carga" = ${updateFreteDto.cargaId} WHERE id = ${id} AND "empresaId" = ${empresaId}`;
       }
       if (updateFreteDto.fazendaId !== undefined) {
-        await this.sql`UPDATE "Frete" SET "fazendaId" = ${updateFreteDto.fazendaId} WHERE id = ${id}`;
+        await this.sql`UPDATE "Frete" SET "fazendaId" = ${updateFreteDto.fazendaId} WHERE id = ${id} AND "empresaId" = ${empresaId}`;
       }
       return { message: 'Frete atualizado com sucesso!' };
     } catch (error) {
@@ -138,10 +147,10 @@ export class FreteService {
     }
   }
 
-  async remove(id: number) {
+  async remove(empresaId: number, id: number) {
     try {
-      await this.notaService.removerArquivosDe({ freteId: id });
-      await this.sql`DELETE FROM "Frete" WHERE id = ${id}`;
+      await this.notaService.removerArquivosDe(empresaId, { freteId: id });
+      await this.sql`DELETE FROM "Frete" WHERE id = ${id} AND "empresaId" = ${empresaId}`;
       return { message: 'Frete removido com sucesso!' };
     } catch (error) {
       console.error('Erro ao remover frete:', error);

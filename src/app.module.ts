@@ -20,6 +20,7 @@ import { CustoFixoModule } from './custo-fixo/custo-fixo.module';
 import { FazendaModule } from './fazenda/fazenda.module';
 import { DocumentoModule } from './documento/documento.module';
 import { NotaModule } from './nota/nota.module';
+import { AdiantamentoModule } from './adiantamento/adiantamento.module';
 
 @Module({
   imports: [
@@ -40,6 +41,7 @@ import { NotaModule } from './nota/nota.module';
     FazendaModule,
     DocumentoModule,
     NotaModule,
+    AdiantamentoModule,
   ],
   controllers: [AppController],
   providers: [

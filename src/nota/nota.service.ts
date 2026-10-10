@@ -19,19 +19,27 @@ export class NotaService {
    * Grava a nota no banco depois que o arquivo já foi enviado direto do
    * navegador pro Vercel Blob (mesmo fluxo do Escritório Virtual).
    */
-  async confirmar(dto: ConfirmarNotaDto) {
+  async confirmar(empresaId: number, dto: ConfirmarNotaDto) {
     try {
       const freteId = dto.freteId ? Number(dto.freteId) : null;
       const manutencaoId = dto.manutencaoId ? Number(dto.manutencaoId) : null;
-      if (!dto.url || !dto.nomeArquivo || (freteId === null) === (manutencaoId === null)) {
-        return { message: 'Informe o arquivo e um frete OU uma manutenção!', error: true };
+      const adiantamentoId = dto.adiantamentoId ? Number(dto.adiantamentoId) : null;
+      const vinculos = [freteId, manutencaoId, adiantamentoId].filter((v) => v !== null).length;
+      if (!dto.url || !dto.nomeArquivo || vinculos !== 1) {
+        return { message: 'Informe o arquivo e um frete, manutenção OU adiantamento!', error: true };
       }
 
       const inserted = await this.sql`
-        INSERT INTO "Nota" ("freteId", "manutencaoId", url, "nomeArquivo", "mimeType", tamanho)
-        VALUES (${freteId}, ${manutencaoId}, ${dto.url}, ${dto.nomeArquivo}, ${dto.mimeType ?? null}, ${dto.tamanho ?? null})
+        INSERT INTO "Nota" ("freteId", "manutencaoId", "adiantamentoId", url, "nomeArquivo", "mimeType", tamanho)
+        SELECT ${freteId}::int, ${manutencaoId}::int, ${adiantamentoId}::int, ${dto.url}::text, ${dto.nomeArquivo}::text, ${dto.mimeType ?? null}::text, ${dto.tamanho ?? null}::int
+        WHERE EXISTS (SELECT 1 FROM "Frete" WHERE id = ${freteId}::int AND "empresaId" = ${empresaId})
+           OR EXISTS (SELECT 1 FROM "Manutencao" WHERE id = ${manutencaoId}::int AND "empresaId" = ${empresaId})
+           OR EXISTS (SELECT 1 FROM "Adiantamento" WHERE id = ${adiantamentoId}::int AND "empresaId" = ${empresaId})
         RETURNING id
       `;
+      if (inserted.length === 0) {
+        return { message: 'Frete, manutenção ou adiantamento não encontrado!', error: true };
+      }
       return { message: 'Nota anexada com sucesso!', id: inserted[0].id };
     } catch (error) {
       console.error('Erro ao salvar nota:', error);
@@ -39,18 +47,24 @@ export class NotaService {
     }
   }
 
-  async findAll(filtros: { freteId?: number; manutencaoId?: number }) {
+  async findAll(empresaId: number, filtros: { freteId?: number; manutencaoId?: number; adiantamentoId?: number }) {
     try {
       const freteId = filtros.freteId ?? null;
       const manutencaoId = filtros.manutencaoId ?? null;
-      if (freteId === null && manutencaoId === null) return [];
+      const adiantamentoId = filtros.adiantamentoId ?? null;
+      if (freteId === null && manutencaoId === null && adiantamentoId === null) return [];
 
       return await this.sql`
-        SELECT id, "freteId", "manutencaoId", "nomeArquivo", "mimeType", tamanho, "criadoEm"
-        FROM "Nota"
-        WHERE (${freteId}::int IS NOT NULL AND "freteId" = ${freteId}::int)
-           OR (${manutencaoId}::int IS NOT NULL AND "manutencaoId" = ${manutencaoId}::int)
-        ORDER BY "criadoEm", id
+        SELECT n.id, n."freteId", n."manutencaoId", n."adiantamentoId", n."nomeArquivo", n."mimeType", n.tamanho, n."criadoEm"
+        FROM "Nota" n
+        LEFT JOIN "Frete" f ON f.id = n."freteId"
+        LEFT JOIN "Manutencao" m ON m.id = n."manutencaoId"
+        LEFT JOIN "Adiantamento" ad ON ad.id = n."adiantamentoId"
+        WHERE ((${freteId}::int IS NOT NULL AND n."freteId" = ${freteId}::int)
+           OR (${manutencaoId}::int IS NOT NULL AND n."manutencaoId" = ${manutencaoId}::int)
+           OR (${adiantamentoId}::int IS NOT NULL AND n."adiantamentoId" = ${adiantamentoId}::int))
+          AND COALESCE(f."empresaId", m."empresaId", ad."empresaId") = ${empresaId}
+        ORDER BY n."criadoEm", n.id
       `;
     } catch (error) {
       console.error('Erro ao buscar notas:', error);
@@ -58,9 +72,9 @@ export class NotaService {
     }
   }
 
-  async streamArquivo(id: number, res: Response) {
+  async streamArquivo(empresaId: number, id: number, res: Response) {
     try {
-      const rows = await this.sql`SELECT url, "mimeType", "nomeArquivo" FROM "Nota" WHERE id = ${id}`;
+      const rows = await this.notaDaEmpresa(empresaId, id);
       if (rows.length === 0) {
         res.status(404).json({ message: 'Nota não encontrada!' });
         return;
@@ -82,9 +96,9 @@ export class NotaService {
     }
   }
 
-  async remove(id: number) {
+  async remove(empresaId: number, id: number) {
     try {
-      const rows = await this.sql`SELECT url FROM "Nota" WHERE id = ${id}`;
+      const rows = await this.notaDaEmpresa(empresaId, id);
       if (rows.length === 0) {
         return { message: 'Nota não encontrada!', error: true };
       }
@@ -99,14 +113,37 @@ export class NotaService {
   }
 
   /**
-   * Chamado antes de excluir um frete/manutenção: o ON DELETE CASCADE apaga
+   * Chamado antes de excluir um frete/manutenção/adiantamento: o ON DELETE CASCADE apaga
    * as linhas de "Nota", mas os arquivos no Blob precisam ser removidos aqui.
    */
-  async removerArquivosDe(vinculo: { freteId?: number; manutencaoId?: number }) {
+  async removerArquivosDe(empresaId: number, vinculo: { freteId?: number; manutencaoId?: number; adiantamentoId?: number }) {
     const rows = vinculo.freteId
-      ? await this.sql`SELECT url FROM "Nota" WHERE "freteId" = ${vinculo.freteId}`
-      : await this.sql`SELECT url FROM "Nota" WHERE "manutencaoId" = ${vinculo.manutencaoId}`;
+      ? await this.sql`
+          SELECT n.url FROM "Nota" n JOIN "Frete" f ON f.id = n."freteId"
+          WHERE n."freteId" = ${vinculo.freteId} AND f."empresaId" = ${empresaId}
+        `
+      : vinculo.manutencaoId
+        ? await this.sql`
+            SELECT n.url FROM "Nota" n JOIN "Manutencao" m ON m.id = n."manutencaoId"
+            WHERE n."manutencaoId" = ${vinculo.manutencaoId} AND m."empresaId" = ${empresaId}
+          `
+        : await this.sql`
+            SELECT n.url FROM "Nota" n JOIN "Adiantamento" ad ON ad.id = n."adiantamentoId"
+            WHERE n."adiantamentoId" = ${vinculo.adiantamentoId} AND ad."empresaId" = ${empresaId}
+          `;
     await this.apagarArquivos(rows.map((r) => r.url));
+  }
+
+  /** A nota não tem empresa própria: herda a do frete, manutenção ou adiantamento. */
+  private notaDaEmpresa(empresaId: number, id: number) {
+    return this.sql`
+      SELECT n.url, n."mimeType", n."nomeArquivo"
+      FROM "Nota" n
+      LEFT JOIN "Frete" f ON f.id = n."freteId"
+      LEFT JOIN "Manutencao" m ON m.id = n."manutencaoId"
+      LEFT JOIN "Adiantamento" ad ON ad.id = n."adiantamentoId"
+      WHERE n.id = ${id} AND COALESCE(f."empresaId", m."empresaId", ad."empresaId") = ${empresaId}
+    `;
   }
 
   private async apagarArquivos(urls: string[]) {

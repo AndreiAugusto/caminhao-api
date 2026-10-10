@@ -1,5 +1,6 @@
 import { Controller, Get, Post, Body, Patch, Param, Delete } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
+import { EmpresaId } from '../empresa/empresa.decorator';
 import { CustoFixoService } from './custo-fixo.service';
 import { CreateCustoFixoDto } from './dto/create-custo-fixo.dto';
 import { UpdateCustoFixoDto } from './dto/update-custo-fixo.dto';
@@ -13,49 +14,49 @@ export class CustoFixoController {
 
   @ApiOperation({ summary: 'Registrar custo fixo' })
   @Post()
-  create(@Body() createCustoFixoDto: CreateCustoFixoDto) {
-    return this.custoFixoService.create(createCustoFixoDto);
+  create(@EmpresaId() empresaId: number, @Body() createCustoFixoDto: CreateCustoFixoDto) {
+    return this.custoFixoService.create(empresaId, createCustoFixoDto);
   }
 
   @ApiOperation({ summary: 'Listar todos os custos fixos' })
   @Get()
-  findAll() {
-    return this.custoFixoService.findAll();
+  findAll(@EmpresaId() empresaId: number) {
+    return this.custoFixoService.findAll(empresaId);
   }
 
   @ApiOperation({ summary: 'Buscar custo fixo por ID' })
   @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.custoFixoService.findOne(+id);
+  findOne(@EmpresaId() empresaId: number, @Param('id') id: string) {
+    return this.custoFixoService.findOne(empresaId, +id);
   }
 
   @ApiOperation({ summary: 'Atualizar custo fixo' })
   @Patch(':id')
-  update(@Param('id') id: string, @Body() updateCustoFixoDto: UpdateCustoFixoDto) {
-    return this.custoFixoService.update(+id, updateCustoFixoDto);
+  update(@EmpresaId() empresaId: number, @Param('id') id: string, @Body() updateCustoFixoDto: UpdateCustoFixoDto) {
+    return this.custoFixoService.update(empresaId, +id, updateCustoFixoDto);
   }
 
   @ApiOperation({ summary: 'Remover custo fixo' })
   @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.custoFixoService.remove(+id);
+  remove(@EmpresaId() empresaId: number, @Param('id') id: string) {
+    return this.custoFixoService.remove(empresaId, +id);
   }
 
   @ApiOperation({ summary: 'Listar ajustes de valor por mês de um custo fixo' })
   @Get(':id/ajustes')
-  findAjustes(@Param('id') id: string) {
-    return this.custoFixoService.findAjustes(+id);
+  findAjustes(@EmpresaId() empresaId: number, @Param('id') id: string) {
+    return this.custoFixoService.findAjustes(empresaId, +id);
   }
 
   @ApiOperation({ summary: 'Criar ou atualizar o ajuste de valor de um mês específico' })
   @Post(':id/ajustes')
-  upsertAjuste(@Param('id') id: string, @Body() dto: UpsertAjusteCustoFixoDto) {
-    return this.custoFixoService.upsertAjuste(+id, dto);
+  upsertAjuste(@EmpresaId() empresaId: number, @Param('id') id: string, @Body() dto: UpsertAjusteCustoFixoDto) {
+    return this.custoFixoService.upsertAjuste(empresaId, +id, dto);
   }
 
   @ApiOperation({ summary: 'Remover o ajuste de um mês (volta a usar o valor padrão)' })
   @Delete('ajustes/:ajusteId')
-  removeAjuste(@Param('ajusteId') ajusteId: string) {
-    return this.custoFixoService.removeAjuste(+ajusteId);
+  removeAjuste(@EmpresaId() empresaId: number, @Param('ajusteId') ajusteId: string) {
+    return this.custoFixoService.removeAjuste(empresaId, +ajusteId);
   }
 }

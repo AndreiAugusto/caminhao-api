@@ -13,9 +13,9 @@ export class OficinaService {
       this.sql = neon(databaseUrl);
   }
 
-  async create(createOficinaDto: CreateOficinaDto) {
+  async create(empresaId: number, createOficinaDto: CreateOficinaDto) {
     try {
-      const inserted = await this.sql`INSERT INTO "Oficina" ("nomeOficina") VALUES (${createOficinaDto.nomeOficina}) RETURNING id`;
+      const inserted = await this.sql`INSERT INTO "Oficina" ("nomeOficina", "empresaId") VALUES (${createOficinaDto.nomeOficina}, ${empresaId}) RETURNING id`;
       return { message: 'Oficina criada com sucesso!', id: inserted[0].id };
     } catch (error) {
       console.error('Erro ao criar oficina:', error);
@@ -23,9 +23,9 @@ export class OficinaService {
     }
   }
 
-  async findAll() {
+  async findAll(empresaId: number) {
     try {
-        const data = await this.sql`Select * from "Oficina"`;
+        const data = await this.sql`Select * from "Oficina" WHERE "empresaId" = ${empresaId}`;
         return data;            
     } catch (error) {
         console.error('Erro ao buscar oficinas:', error);
@@ -33,9 +33,9 @@ export class OficinaService {
     }
   }
 
-  async findOne(id: number) {
+  async findOne(empresaId: number, id: number) {
     try {
-        const data = await this.sql`Select * from "Oficina" where id = ${id}`;
+        const data = await this.sql`Select * from "Oficina" WHERE id = ${id} AND "empresaId" = ${empresaId}`;
         return data;            
     } catch (error) {
         console.error('Erro ao buscar oficinas:', error);
@@ -43,10 +43,10 @@ export class OficinaService {
     }
   }
 
-  async update(id: number, updateOficinaDto: UpdateOficinaDto) {
+  async update(empresaId: number, id: number, updateOficinaDto: UpdateOficinaDto) {
     try {
         if(updateOficinaDto.nomeOficina){
-            await this.sql`UPDATE "Oficina" SET "nomeOficina" = ${updateOficinaDto.nomeOficina} WHERE id = ${id}`;
+            await this.sql`UPDATE "Oficina" SET "nomeOficina" = ${updateOficinaDto.nomeOficina} WHERE id = ${id} AND "empresaId" = ${empresaId}`;
         }
         return { message: 'Oficina atualizada com sucesso!' };
     } catch (error) {
@@ -55,9 +55,9 @@ export class OficinaService {
     }
   }
 
-  async remove(id: number) {
+  async remove(empresaId: number, id: number) {
     try {
-      await this.sql`DELETE FROM "Oficina" WHERE id = ${id}`;
+      await this.sql`DELETE FROM "Oficina" WHERE id = ${id} AND "empresaId" = ${empresaId}`;
       return { message: 'Oficina removida com sucesso!' };
     } catch (error) {
       console.error('Erro ao remover oficina:', error);

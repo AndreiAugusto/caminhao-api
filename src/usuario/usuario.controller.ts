@@ -1,8 +1,7 @@
-import { Body, Controller, Get, Param, Patch, Post, Req, HttpCode, HttpStatus, BadRequestException, UnauthorizedException, ConflictException, NotFoundException } from '@nestjs/common';
+import { Body, Controller, Get, Patch, Post, Req, HttpCode, HttpStatus, BadRequestException, UnauthorizedException, ConflictException, NotFoundException } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { UsuarioService } from './usuario.service';
 import { CreateUsuarioDto } from './dto/create-usuario.dto';
-import { UpdateUsuarioDto } from './dto/update-usuario.dto';
 import { Public } from '../auth/public.decorator';
 import { LoginUsuarioDto } from './dto/login-usuario.dto';
 import { UpdatePerfilDto } from './dto/update-perfil.dto';
@@ -14,13 +13,6 @@ const jwt = require('jsonwebtoken');
 @Controller('usuario')
 export class UsuarioController {
   constructor(private readonly usuarioService: UsuarioService) {}
-
-  @ApiBearerAuth()
-  @ApiOperation({ summary: 'Listar todos os usuários' })
-  @Get('')
-  async getTable() {
-    return this.usuarioService.getTableUsuario();
-  }
 
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Buscar dados do usuário logado' })
@@ -73,30 +65,6 @@ export class UsuarioController {
     return { message: 'Dados atualizados com sucesso!' };
   }
 
-  @ApiBearerAuth()
-  @ApiOperation({ summary: 'Buscar usuário por ID' })
-  @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.usuarioService.findOne(+id);
-  }
-
-  @ApiBearerAuth()
-  @ApiOperation({ summary: 'Criar usuário' })
-  @Post('')
-  async createUsuario(@Body() createUsuarioDto: CreateUsuarioDto) {
-    return this.usuarioService.createUsuario(createUsuarioDto);
-  }
-
-  @ApiBearerAuth()
-  @ApiOperation({ summary: 'Atualizar usuário' })
-  @Patch(':id')
-  async update(@Param('id') id: string, @Body() updateUsuarioDto: UpdateUsuarioDto) {
-    if (updateUsuarioDto.senha) {
-      updateUsuarioDto.senha = await bcrypt.hash(updateUsuarioDto.senha, Number(process.env.SALT));
-    }
-    return this.usuarioService.update(+id, updateUsuarioDto);
-  }
-
   @Public()
   @ApiOperation({ summary: 'Login' })
   @Post('login')
@@ -118,7 +86,7 @@ export class UsuarioController {
     }
 
     const accessToken = jwt.sign(
-      { id: user.id, nome: user.nome },
+      { id: user.id, nome: user.nome, empresaId: user.empresaId },
       process.env.TOKEN_SECRET,
       { expiresIn: process.env.TOKEN_EXPIRES_IN },
     );

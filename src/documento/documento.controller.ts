@@ -1,6 +1,7 @@
 import { Controller, Get, Post, Patch, Body, Param, Delete, Query, UploadedFile, UseInterceptors, Res, Req } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery, ApiConsumes, ApiBody } from '@nestjs/swagger';
+import { EmpresaId } from '../empresa/empresa.decorator';
 import type { Request, Response } from 'express';
 import { handleUpload, type HandleUploadBody } from '@vercel/blob/client';
 import { DocumentoService } from './documento.service';
@@ -62,8 +63,8 @@ export class DocumentoController {
 
   @ApiOperation({ summary: 'Confirmar documento cujo arquivo já foi enviado direto ao Vercel Blob' })
   @Post('confirmar')
-  confirmarUpload(@Body() dto: ConfirmarUploadDto) {
-    return this.documentoService.createFromBlob(dto);
+  confirmarUpload(@EmpresaId() empresaId: number, @Body() dto: ConfirmarUploadDto) {
+    return this.documentoService.createFromBlob(empresaId, dto);
   }
 
   @ApiOperation({ summary: 'Enviar documento (upload)' })
@@ -84,16 +85,16 @@ export class DocumentoController {
   })
   @Post()
   @UseInterceptors(FileInterceptor('arquivo', { limits: { fileSize: 4 * 1024 * 1024 } }))
-  create(@Body() createDocumentoDto: CreateDocumentoDto, @UploadedFile() arquivo?: Express.Multer.File) {
-    return this.documentoService.create(createDocumentoDto, arquivo);
+  create(@EmpresaId() empresaId: number, @Body() createDocumentoDto: CreateDocumentoDto, @UploadedFile() arquivo?: Express.Multer.File) {
+    return this.documentoService.create(empresaId, createDocumentoDto, arquivo);
   }
 
   @ApiOperation({ summary: 'Listar documentos (filtrar por tipo e/ou entidade vinculada)' })
   @ApiQuery({ name: 'tipo', required: false, enum: ['empresa', 'caminhao', 'motorista', 'fazenda'] })
   @ApiQuery({ name: 'entidadeId', required: false, description: 'ID do caminhão/motorista/fazenda vinculado' })
   @Get()
-  findAll(@Query('tipo') tipo?: string, @Query('entidadeId') entidadeId?: string) {
-    return this.documentoService.findAll({
+  findAll(@EmpresaId() empresaId: number, @Query('tipo') tipo?: string, @Query('entidadeId') entidadeId?: string) {
+    return this.documentoService.findAll(empresaId, {
       tipo,
       entidadeId: entidadeId ? +entidadeId : undefined,
     });
@@ -101,19 +102,19 @@ export class DocumentoController {
 
   @ApiOperation({ summary: 'Atualizar título, categoria e/ou onde o documento está vinculado (não altera o arquivo)' })
   @Patch(':id')
-  update(@Param('id') id: string, @Body() dto: UpdateDocumentoDto) {
-    return this.documentoService.update(+id, dto);
+  update(@EmpresaId() empresaId: number, @Param('id') id: string, @Body() dto: UpdateDocumentoDto) {
+    return this.documentoService.update(empresaId, +id, dto);
   }
 
   @ApiOperation({ summary: 'Baixar/visualizar o arquivo de um documento (stream autenticado, o Blob é privado)' })
   @Get(':id/arquivo')
-  async getArquivo(@Param('id') id: string, @Res() res: Response) {
-    await this.documentoService.streamArquivo(+id, res);
+  async getArquivo(@EmpresaId() empresaId: number, @Param('id') id: string, @Res() res: Response) {
+    await this.documentoService.streamArquivo(empresaId, +id, res);
   }
 
   @ApiOperation({ summary: 'Remover documento' })
   @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.documentoService.remove(+id);
+  remove(@EmpresaId() empresaId: number, @Param('id') id: string) {
+    return this.documentoService.remove(empresaId, +id);
   }
 }

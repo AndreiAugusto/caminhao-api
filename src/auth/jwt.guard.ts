@@ -24,9 +24,14 @@ export class JwtAuthGuard implements CanActivate {
     try {
       const payload = jwt.verify(token, process.env.TOKEN_SECRET);
       request.user = payload;
-      return true;
     } catch {
       throw new UnauthorizedException('Token inválido ou expirado!');
     }
+    // Tokens emitidos antes da separação por empresa não têm empresaId:
+    // força um novo login em vez de deixar a requisição sem escopo.
+    if (!request.user.empresaId) {
+      throw new UnauthorizedException('Sessão expirada, faça login novamente!');
+    }
+    return true;
   }
 }

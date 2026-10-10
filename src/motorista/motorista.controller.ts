@@ -1,5 +1,6 @@
 import { Controller, Get, Post, Body, Patch, Param, Delete } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
+import { EmpresaId } from '../empresa/empresa.decorator';
 import { MotoristaService } from './motorista.service';
 import { CreateMotoristaDto } from './dto/create-motorista.dto';
 import { UpdateMotoristaDto } from './dto/update-motorista.dto';
@@ -12,31 +13,31 @@ export class MotoristaController {
 
   @ApiOperation({ summary: 'Cadastrar motorista' })
   @Post()
-  create(@Body() createMotoristaDto: CreateMotoristaDto) {
-    return this.motoristaService.create(createMotoristaDto);
+  create(@EmpresaId() empresaId: number, @Body() createMotoristaDto: CreateMotoristaDto) {
+    return this.motoristaService.create(empresaId, createMotoristaDto);
   }
 
   @ApiOperation({ summary: 'Listar todos os motoristas' })
   @Get()
-  findAll() {
-    return this.motoristaService.findAll();
+  findAll(@EmpresaId() empresaId: number) {
+    return this.motoristaService.findAll(empresaId);
   }
 
   @ApiOperation({ summary: 'Buscar motorista por ID' })
   @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.motoristaService.findOne(+id);
+  findOne(@EmpresaId() empresaId: number, @Param('id') id: string) {
+    return this.motoristaService.findOne(empresaId, +id);
   }
 
   @ApiOperation({ summary: 'Atualizar motorista' })
   @Patch(':id')
-  update(@Param('id') id: string, @Body() updateMotoristaDto: UpdateMotoristaDto) {
-    return this.motoristaService.update(+id, updateMotoristaDto);
+  update(@EmpresaId() empresaId: number, @Param('id') id: string, @Body() updateMotoristaDto: UpdateMotoristaDto) {
+    return this.motoristaService.update(empresaId, +id, updateMotoristaDto);
   }
 
   @ApiOperation({ summary: 'Remover motorista' })
   @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.motoristaService.remove(+id);
+  remove(@EmpresaId() empresaId: number, @Param('id') id: string) {
+    return this.motoristaService.remove(empresaId, +id);
   }
 }

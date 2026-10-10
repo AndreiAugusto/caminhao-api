@@ -14,14 +14,14 @@ export class FazendaService {
     this.sql = neon(databaseUrl);
   }
 
-  async create(createFazendaDto: CreateFazendaDto) {
+  async create(empresaId: number, createFazendaDto: CreateFazendaDto) {
     try {
       if (!createFazendaDto.nome) {
         return { message: 'Verifique os campos obrigatórios!' };
       }
       const inserted = await this.sql`
-        INSERT INTO "Fazenda" (nome, cidade_id)
-        VALUES (${createFazendaDto.nome}, ${createFazendaDto.cidadeId ?? null})
+        INSERT INTO "Fazenda" (nome, cidade_id, "empresaId")
+        VALUES (${createFazendaDto.nome}, ${createFazendaDto.cidadeId ?? null}, ${empresaId})
         RETURNING id
       `;
       return { message: 'Fazenda criada com sucesso!', id: inserted[0].id };
@@ -31,7 +31,7 @@ export class FazendaService {
     }
   }
 
-  async findAll() {
+  async findAll(empresaId: number) {
     try {
       const data = await this.sql`
         SELECT
@@ -47,6 +47,7 @@ export class FazendaService {
         LEFT JOIN (
           SELECT "fazendaId", COUNT(*) AS total FROM "FazendaContato" GROUP BY "fazendaId"
         ) fc ON fc."fazendaId" = f.id
+        WHERE f."empresaId" = ${empresaId}
         ORDER BY f.nome ASC
       `;
       return data;
@@ -56,9 +57,9 @@ export class FazendaService {
     }
   }
 
-  async findOne(id: number) {
+  async findOne(empresaId: number, id: number) {
     try {
-      const data = await this.sql`SELECT * FROM "Fazenda" WHERE id = ${id}`;
+      const data = await this.sql`SELECT * FROM "Fazenda" WHERE id = ${id} AND "empresaId" = ${empresaId}`;
       return data;
     } catch (error) {
       console.error('Erro ao buscar fazenda:', error);
@@ -66,13 +67,13 @@ export class FazendaService {
     }
   }
 
-  async update(id: number, updateFazendaDto: UpdateFazendaDto) {
+  async update(empresaId: number, id: number, updateFazendaDto: UpdateFazendaDto) {
     try {
       if (updateFazendaDto.nome) {
-        await this.sql`UPDATE "Fazenda" SET nome = ${updateFazendaDto.nome} WHERE id = ${id}`;
+        await this.sql`UPDATE "Fazenda" SET nome = ${updateFazendaDto.nome} WHERE id = ${id} AND "empresaId" = ${empresaId}`;
       }
       if (updateFazendaDto.cidadeId !== undefined) {
-        await this.sql`UPDATE "Fazenda" SET cidade_id = ${updateFazendaDto.cidadeId ?? null} WHERE id = ${id}`;
+        await this.sql`UPDATE "Fazenda" SET cidade_id = ${updateFazendaDto.cidadeId ?? null} WHERE id = ${id} AND "empresaId" = ${empresaId}`;
       }
       return { message: 'Fazenda atualizada com sucesso!' };
     } catch (error) {
@@ -81,9 +82,9 @@ export class FazendaService {
     }
   }
 
-  async remove(id: number) {
+  async remove(empresaId: number, id: number) {
     try {
-      await this.sql`DELETE FROM "Fazenda" WHERE id = ${id}`;
+      await this.sql`DELETE FROM "Fazenda" WHERE id = ${id} AND "empresaId" = ${empresaId}`;
       return { message: 'Fazenda removida com sucesso!' };
     } catch (error) {
       console.error('Erro ao remover fazenda:', error);
@@ -91,13 +92,14 @@ export class FazendaService {
     }
   }
 
-  async findContatos(fazendaId: number) {
+  async findContatos(empresaId: number, fazendaId: number) {
     try {
       const data = await this.sql`
-        SELECT id, "fazendaId", contato
-        FROM "FazendaContato"
-        WHERE "fazendaId" = ${fazendaId}
-        ORDER BY id ASC
+        SELECT fc.id, fc."fazendaId", fc.contato
+        FROM "FazendaContato" fc
+        JOIN "Fazenda" f ON f.id = fc."fazendaId"
+        WHERE fc."fazendaId" = ${fazendaId} AND f."empresaId" = ${empresaId}
+        ORDER BY fc.id ASC
       `;
       return data;
     } catch (error) {
@@ -106,16 +108,21 @@ export class FazendaService {
     }
   }
 
-  async addContato(fazendaId: number, dto: CreateFazendaContatoDto) {
+  async addContato(empresaId: number, fazendaId: number, dto: CreateFazendaContatoDto) {
     try {
       if (!dto.contato) {
         return { message: 'Verifique os campos obrigatórios!' };
       }
       const inserted = await this.sql`
         INSERT INTO "FazendaContato" ("fazendaId", contato)
-        VALUES (${fazendaId}, ${dto.contato})
+        SELECT id, ${dto.contato}::text
+        FROM "Fazenda"
+        WHERE id = ${fazendaId} AND "empresaId" = ${empresaId}
         RETURNING id
       `;
+      if (inserted.length === 0) {
+        return { message: 'Fazenda não encontrada!', error: true };
+      }
       return { message: 'Contato adicionado com sucesso!', id: inserted[0].id };
     } catch (error) {
       console.error('Erro ao adicionar contato da fazenda:', error);
@@ -123,9 +130,13 @@ export class FazendaService {
     }
   }
 
-  async removeContato(contatoId: number) {
+  async removeContato(empresaId: number, contatoId: number) {
     try {
-      await this.sql`DELETE FROM "FazendaContato" WHERE id = ${contatoId}`;
+      await this.sql`
+        DELETE FROM "FazendaContato" fc
+        USING "Fazenda" f
+        WHERE fc.id = ${contatoId} AND f.id = fc."fazendaId" AND f."empresaId" = ${empresaId}
+      `;
       return { message: 'Contato removido com sucesso!' };
     } catch (error) {
       console.error('Erro ao remover contato da fazenda:', error);

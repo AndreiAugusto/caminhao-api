@@ -13,9 +13,9 @@ export class MotoristaService {
       this.sql = neon(databaseUrl);
   }
 
-  async create(createMotoristaDto: CreateMotoristaDto) {
+  async create(empresaId: number, createMotoristaDto: CreateMotoristaDto) {
     try {
-      await this.sql`INSERT INTO "Motorista" ("nomeMotorista", nascimento, "nCarteira") VALUES (${createMotoristaDto.nomeMotorista}, ${createMotoristaDto.nascimento}, ${createMotoristaDto.nCarteira})`;
+      await this.sql`INSERT INTO "Motorista" ("nomeMotorista", nascimento, "nCarteira", "empresaId") VALUES (${createMotoristaDto.nomeMotorista}, ${createMotoristaDto.nascimento}, ${createMotoristaDto.nCarteira}, ${empresaId})`;
       return { message: 'Motorista criado com sucesso!' }; 
     } catch (error) {
       console.error('Erro ao criar motorista:', error);
@@ -23,9 +23,9 @@ export class MotoristaService {
     }
   }
 
-  async findAll() {
+  async findAll(empresaId: number) {
     try {
-        const data = await this.sql`Select * from "Motorista"`;
+        const data = await this.sql`Select * from "Motorista" WHERE "empresaId" = ${empresaId}`;
         return data;            
     } catch (error) {
         console.error('Erro ao buscar motoristas:', error);
@@ -33,9 +33,9 @@ export class MotoristaService {
     }
   }
 
-  async findOne(id: number) {
+  async findOne(empresaId: number, id: number) {
     try {
-        const data = await this.sql`Select * from "Motorista" where id = ${id}`;
+        const data = await this.sql`Select * from "Motorista" WHERE id = ${id} AND "empresaId" = ${empresaId}`;
         return data;            
     } catch (error) {
         console.error('Erro ao buscar motoristas:', error);
@@ -43,16 +43,16 @@ export class MotoristaService {
     }
   }
 
-  async update(id: number, updateMotoristaDto: UpdateMotoristaDto) {
+  async update(empresaId: number, id: number, updateMotoristaDto: UpdateMotoristaDto) {
     try {
         if(updateMotoristaDto.nomeMotorista){
-            await this.sql`UPDATE "Motorista" SET "nomeMotorista" = ${updateMotoristaDto.nomeMotorista} WHERE id = ${id}`;
+            await this.sql`UPDATE "Motorista" SET "nomeMotorista" = ${updateMotoristaDto.nomeMotorista} WHERE id = ${id} AND "empresaId" = ${empresaId}`;
         }
         if(updateMotoristaDto.nascimento){
-            await this.sql`UPDATE "Motorista" SET nascimento = ${updateMotoristaDto.nascimento} WHERE id = ${id}`;
+            await this.sql`UPDATE "Motorista" SET nascimento = ${updateMotoristaDto.nascimento} WHERE id = ${id} AND "empresaId" = ${empresaId}`;
         }
         if(updateMotoristaDto.nCarteira){
-            await this.sql`UPDATE "Motorista" SET "nCarteira" = ${updateMotoristaDto.nCarteira} WHERE id = ${id}`;
+            await this.sql`UPDATE "Motorista" SET "nCarteira" = ${updateMotoristaDto.nCarteira} WHERE id = ${id} AND "empresaId" = ${empresaId}`;
         }
         return { message: 'Motorista atualizado com sucesso!' };
     } catch (error) {
@@ -61,9 +61,9 @@ export class MotoristaService {
     }
   }
 
-  async remove(id: number) {
+  async remove(empresaId: number, id: number) {
     try {
-      await this.sql`DELETE FROM "Motorista" WHERE id = ${id}`;
+      await this.sql`DELETE FROM "Motorista" WHERE id = ${id} AND "empresaId" = ${empresaId}`;
       return { message: 'Motorista removido com sucesso!' };
     } catch (error) {
       console.error('Erro ao remover motorista:', error);

@@ -7,6 +7,7 @@ import type { Response } from 'express';
 import { CreateDocumentoDto } from './dto/create-documento.dto';
 import { UpdateDocumentoDto } from './dto/update-documento.dto';
 import { ConfirmarUploadDto } from './dto/confirmar-upload.dto';
+import { vinculosDaEmpresa, VINCULO_INVALIDO } from '../empresa/vinculos';
 
 @Injectable()
 export class DocumentoService {
@@ -17,10 +18,17 @@ export class DocumentoService {
     this.sql = neon(databaseUrl);
   }
 
-  async create(dto: CreateDocumentoDto, file?: Express.Multer.File) {
+  async create(empresaId: number, dto: CreateDocumentoDto, file?: Express.Multer.File) {
     try {
       if (!dto.titulo || !dto.tipo || !file) {
         return { message: 'Verifique os campos obrigatórios (título, tipo e arquivo)!' };
+      }
+
+      const caminhaoId = dto.caminhaoId ? Number(dto.caminhaoId) : null;
+      const motoristaId = dto.motoristaId ? Number(dto.motoristaId) : null;
+      const fazendaId = dto.fazendaId ? Number(dto.fazendaId) : null;
+      if (!(await vinculosDaEmpresa(this.sql, empresaId, { caminhaoId, motoristaId, fazendaId }))) {
+        return VINCULO_INVALIDO;
       }
 
       const token = this.configService.get('BLOB_READ_WRITE_TOKEN');
@@ -31,17 +39,13 @@ export class DocumentoService {
         contentType: file.mimetype,
       });
 
-      const caminhaoId = dto.caminhaoId ? Number(dto.caminhaoId) : null;
-      const motoristaId = dto.motoristaId ? Number(dto.motoristaId) : null;
-      const fazendaId = dto.fazendaId ? Number(dto.fazendaId) : null;
-
       const inserted = await this.sql`
         INSERT INTO "Documento"
-          (titulo, categoria, tipo, "caminhaoId", "motoristaId", "fazendaId", url, "nomeArquivo", "mimeType", tamanho)
+          (titulo, categoria, tipo, "caminhaoId", "motoristaId", "fazendaId", url, "nomeArquivo", "mimeType", tamanho, "empresaId")
         VALUES (
           ${dto.titulo}, ${dto.categoria ?? null}, ${dto.tipo},
           ${caminhaoId}, ${motoristaId}, ${fazendaId},
-          ${blob.url}, ${file.originalname}, ${file.mimetype}, ${file.size}
+          ${blob.url}, ${file.originalname}, ${file.mimetype}, ${file.size}, ${empresaId}
         )
         RETURNING id
       `;
@@ -59,7 +63,7 @@ export class DocumentoService {
    * passar pela função serverless — usado para arquivos maiores,
    * que não caberiam no limite de 4.5MB de payload da Vercel).
    */
-  async createFromBlob(dto: ConfirmarUploadDto) {
+  async createFromBlob(empresaId: number, dto: ConfirmarUploadDto) {
     try {
       if (!dto.titulo || !dto.tipo || !dto.url) {
         return { message: 'Verifique os campos obrigatórios (título, tipo e arquivo)!' };
@@ -68,14 +72,17 @@ export class DocumentoService {
       const caminhaoId = dto.caminhaoId ? Number(dto.caminhaoId) : null;
       const motoristaId = dto.motoristaId ? Number(dto.motoristaId) : null;
       const fazendaId = dto.fazendaId ? Number(dto.fazendaId) : null;
+      if (!(await vinculosDaEmpresa(this.sql, empresaId, { caminhaoId, motoristaId, fazendaId }))) {
+        return VINCULO_INVALIDO;
+      }
 
       const inserted = await this.sql`
         INSERT INTO "Documento"
-          (titulo, categoria, tipo, "caminhaoId", "motoristaId", "fazendaId", url, "nomeArquivo", "mimeType", tamanho)
+          (titulo, categoria, tipo, "caminhaoId", "motoristaId", "fazendaId", url, "nomeArquivo", "mimeType", tamanho, "empresaId")
         VALUES (
           ${dto.titulo}, ${dto.categoria ?? null}, ${dto.tipo},
           ${caminhaoId}, ${motoristaId}, ${fazendaId},
-          ${dto.url}, ${dto.nomeArquivo}, ${dto.mimeType}, ${dto.tamanho}
+          ${dto.url}, ${dto.nomeArquivo}, ${dto.mimeType}, ${dto.tamanho}, ${empresaId}
         )
         RETURNING id
       `;
@@ -87,7 +94,7 @@ export class DocumentoService {
     }
   }
 
-  async findAll(filtros: { tipo?: string; entidadeId?: number }) {
+  async findAll(empresaId: number, filtros: { tipo?: string; entidadeId?: number }) {
     try {
       const tipo = filtros.tipo ?? null;
       const entidadeId = filtros.entidadeId ?? null;
@@ -102,7 +109,8 @@ export class DocumentoService {
         LEFT JOIN "Caminhao" c ON c.id = d."caminhaoId"
         LEFT JOIN "Motorista" m ON m.id = d."motoristaId"
         LEFT JOIN "Fazenda" f ON f.id = d."fazendaId"
-        WHERE (${tipo}::text IS NULL OR d.tipo = ${tipo}::text)
+        WHERE d."empresaId" = ${empresaId}
+          AND (${tipo}::text IS NULL OR d.tipo = ${tipo}::text)
           AND (
             ${entidadeId}::int IS NULL
             OR d."caminhaoId" = ${entidadeId}::int
@@ -118,13 +126,13 @@ export class DocumentoService {
     }
   }
 
-  async update(id: number, dto: UpdateDocumentoDto) {
+  async update(empresaId: number, id: number, dto: UpdateDocumentoDto) {
     try {
       if (dto.titulo) {
-        await this.sql`UPDATE "Documento" SET titulo = ${dto.titulo} WHERE id = ${id}`;
+        await this.sql`UPDATE "Documento" SET titulo = ${dto.titulo} WHERE id = ${id} AND "empresaId" = ${empresaId}`;
       }
       if (dto.categoria !== undefined) {
-        await this.sql`UPDATE "Documento" SET categoria = ${dto.categoria || null} WHERE id = ${id}`;
+        await this.sql`UPDATE "Documento" SET categoria = ${dto.categoria || null} WHERE id = ${id} AND "empresaId" = ${empresaId}`;
       }
       if (dto.tipo) {
         // O "onde foi salvo" é um conjunto único (tipo + a entidade daquele tipo) —
@@ -133,10 +141,13 @@ export class DocumentoService {
         const caminhaoId = dto.tipo === 'caminhao' && dto.caminhaoId ? Number(dto.caminhaoId) : null;
         const motoristaId = dto.tipo === 'motorista' && dto.motoristaId ? Number(dto.motoristaId) : null;
         const fazendaId = dto.tipo === 'fazenda' && dto.fazendaId ? Number(dto.fazendaId) : null;
+        if (!(await vinculosDaEmpresa(this.sql, empresaId, { caminhaoId, motoristaId, fazendaId }))) {
+          return VINCULO_INVALIDO;
+        }
         await this.sql`
           UPDATE "Documento"
           SET tipo = ${dto.tipo}, "caminhaoId" = ${caminhaoId}, "motoristaId" = ${motoristaId}, "fazendaId" = ${fazendaId}
-          WHERE id = ${id}
+          WHERE id = ${id} AND "empresaId" = ${empresaId}
         `;
       }
       return { message: 'Documento atualizado com sucesso!' };
@@ -146,9 +157,9 @@ export class DocumentoService {
     }
   }
 
-  async streamArquivo(id: number, res: Response) {
+  async streamArquivo(empresaId: number, id: number, res: Response) {
     try {
-      const rows = await this.sql`SELECT url, "mimeType", "nomeArquivo" FROM "Documento" WHERE id = ${id}`;
+      const rows = await this.sql`SELECT url, "mimeType", "nomeArquivo" FROM "Documento" WHERE id = ${id} AND "empresaId" = ${empresaId}`;
       if (rows.length === 0) {
         res.status(404).json({ message: 'Documento não encontrado!' });
         return;
@@ -170,16 +181,16 @@ export class DocumentoService {
     }
   }
 
-  async remove(id: number) {
+  async remove(empresaId: number, id: number) {
     try {
-      const rows = await this.sql`SELECT url FROM "Documento" WHERE id = ${id}`;
+      const rows = await this.sql`SELECT url FROM "Documento" WHERE id = ${id} AND "empresaId" = ${empresaId}`;
       if (rows.length === 0) {
         return { message: 'Documento não encontrado!' };
       }
 
       const token = this.configService.get('BLOB_READ_WRITE_TOKEN');
       await del(rows[0].url, { token });
-      await this.sql`DELETE FROM "Documento" WHERE id = ${id}`;
+      await this.sql`DELETE FROM "Documento" WHERE id = ${id} AND "empresaId" = ${empresaId}`;
 
       return { message: 'Documento removido com sucesso!' };
     } catch (error) {

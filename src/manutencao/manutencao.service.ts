@@ -4,6 +4,7 @@ import { Injectable } from '@nestjs/common';
 import { CreateManutencaoDto } from './dto/create-manutencao.dto';
 import { UpdateManutencaoDto } from './dto/update-manutencao.dto';
 import { NotaService } from '../nota/nota.service';
+import { vinculosDaEmpresa, VINCULO_INVALIDO } from '../empresa/vinculos';
 
 @Injectable()
 export class ManutencaoService {
@@ -19,10 +20,13 @@ export class ManutencaoService {
     return resultado.toISOString().slice(0, 10);
   }
 
-  async create(createManutencaoDto: CreateManutencaoDto) {
+  async create(empresaId: number, createManutencaoDto: CreateManutencaoDto) {
     try {
       if(!createManutencaoDto.caminhaoId || !createManutencaoDto.oficinaId  || !createManutencaoDto.data){
         return { message: 'Verifique os campos obrigatórios!' };
+      }
+      if (!(await vinculosDaEmpresa(this.sql, empresaId, createManutencaoDto))) {
+        return VINCULO_INVALIDO;
       }
 
       const numeroParcelas = createManutencaoDto.numeroParcelas && createManutencaoDto.numeroParcelas > 1
@@ -30,8 +34,8 @@ export class ManutencaoService {
         : 1;
 
       const inserted = await this.sql`
-        INSERT INTO "Manutencao" (descricao, custo, data, "caminhaoId", "oficinaId", "numeroParcelas")
-        VALUES (${createManutencaoDto.descricao}, ${createManutencaoDto.custo}, ${createManutencaoDto.data}, ${createManutencaoDto.caminhaoId}, ${createManutencaoDto.oficinaId}, ${numeroParcelas})
+        INSERT INTO "Manutencao" (descricao, custo, data, "caminhaoId", "oficinaId", "numeroParcelas", "empresaId")
+        VALUES (${createManutencaoDto.descricao}, ${createManutencaoDto.custo}, ${createManutencaoDto.data}, ${createManutencaoDto.caminhaoId}, ${createManutencaoDto.oficinaId}, ${numeroParcelas}, ${empresaId})
         RETURNING id
       `;
       const manutencaoId = inserted[0].id;
@@ -55,7 +59,7 @@ export class ManutencaoService {
     }
   }
 
-  async findAll() {
+  async findAll(empresaId: number) {
     try {
       const data = await this.sql`
         SELECT
@@ -79,6 +83,7 @@ export class ManutencaoService {
           FROM "ManutencaoParcela"
           GROUP BY "manutencaoId"
         ) p ON p."manutencaoId" = m.id
+        WHERE m."empresaId" = ${empresaId}
         ORDER BY m.data DESC
       `;
       return data;
@@ -88,13 +93,14 @@ export class ManutencaoService {
     }
   }
 
-  async findParcelas(manutencaoId: number) {
+  async findParcelas(empresaId: number, manutencaoId: number) {
     try {
       const data = await this.sql`
-        SELECT id, "manutencaoId", numero, valor, "dataVencimento", pago
-        FROM "ManutencaoParcela"
-        WHERE "manutencaoId" = ${manutencaoId}
-        ORDER BY numero ASC
+        SELECT mp.id, mp."manutencaoId", mp.numero, mp.valor, mp."dataVencimento", mp.pago
+        FROM "ManutencaoParcela" mp
+        JOIN "Manutencao" m ON m.id = mp."manutencaoId"
+        WHERE mp."manutencaoId" = ${manutencaoId} AND m."empresaId" = ${empresaId}
+        ORDER BY mp.numero ASC
       `;
       return data;
     } catch (error) {
@@ -103,9 +109,13 @@ export class ManutencaoService {
     }
   }
 
-  async pagarParcela(parcelaId: number, pago: boolean) {
+  async pagarParcela(empresaId: number, parcelaId: number, pago: boolean) {
     try {
-      await this.sql`UPDATE "ManutencaoParcela" SET pago = ${pago} WHERE id = ${parcelaId}`;
+      await this.sql`
+        UPDATE "ManutencaoParcela" mp SET pago = ${pago}
+        FROM "Manutencao" m
+        WHERE mp.id = ${parcelaId} AND m.id = mp."manutencaoId" AND m."empresaId" = ${empresaId}
+      `;
       return { message: 'Parcela atualizada com sucesso!' };
     } catch (error) {
       console.error('Erro ao atualizar parcela:', error);
@@ -113,9 +123,9 @@ export class ManutencaoService {
     }
   }
 
-  async findOne(id: number) {
+  async findOne(empresaId: number, id: number) {
     try {
-        const data = await this.sql`Select * from "Manutencao" where id = ${id}`;
+        const data = await this.sql`Select * from "Manutencao" WHERE id = ${id} AND "empresaId" = ${empresaId}`;
         return data;            
     } catch (error) {
         console.error('Erro ao buscar manutenções:', error);
@@ -123,22 +133,25 @@ export class ManutencaoService {
     }
   }
 
-  async update(id: number, updateManutencaoDto: UpdateManutencaoDto) {
+  async update(empresaId: number, id: number, updateManutencaoDto: UpdateManutencaoDto) {
     try {
+        if (!(await vinculosDaEmpresa(this.sql, empresaId, updateManutencaoDto))) {
+          return VINCULO_INVALIDO;
+        }
         if(updateManutencaoDto.descricao){
-            await this.sql`UPDATE "Manutencao" SET descricao = ${updateManutencaoDto.descricao} WHERE id = ${id}`;
+            await this.sql`UPDATE "Manutencao" SET descricao = ${updateManutencaoDto.descricao} WHERE id = ${id} AND "empresaId" = ${empresaId}`;
         }
         if(updateManutencaoDto.custo){
-            await this.sql`UPDATE "Manutencao" SET custo = ${updateManutencaoDto.custo} WHERE id = ${id}`;
+            await this.sql`UPDATE "Manutencao" SET custo = ${updateManutencaoDto.custo} WHERE id = ${id} AND "empresaId" = ${empresaId}`;
         }
         if(updateManutencaoDto.data){
-            await this.sql`UPDATE "Manutencao" SET data = ${updateManutencaoDto.data} WHERE id = ${id}`;
+            await this.sql`UPDATE "Manutencao" SET data = ${updateManutencaoDto.data} WHERE id = ${id} AND "empresaId" = ${empresaId}`;
         }
         if(updateManutencaoDto.caminhaoId){
-            await this.sql`UPDATE "Manutencao" SET "caminhaoId" = ${updateManutencaoDto.caminhaoId} WHERE id = ${id}`;
+            await this.sql`UPDATE "Manutencao" SET "caminhaoId" = ${updateManutencaoDto.caminhaoId} WHERE id = ${id} AND "empresaId" = ${empresaId}`;
         }
         if(updateManutencaoDto.oficinaId){
-            await this.sql`UPDATE "Manutencao" SET "oficinaId" = ${updateManutencaoDto.oficinaId} WHERE id = ${id}`;
+            await this.sql`UPDATE "Manutencao" SET "oficinaId" = ${updateManutencaoDto.oficinaId} WHERE id = ${id} AND "empresaId" = ${empresaId}`;
         }
 
         return { message: 'Manutenção atualizada com sucesso!' };
@@ -148,10 +161,10 @@ export class ManutencaoService {
     }
   }
 
-  async remove(id: number) {
+  async remove(empresaId: number, id: number) {
     try {
-      await this.notaService.removerArquivosDe({ manutencaoId: id });
-      await this.sql`DELETE FROM "Manutencao" WHERE id = ${id}`;
+      await this.notaService.removerArquivosDe(empresaId, { manutencaoId: id });
+      await this.sql`DELETE FROM "Manutencao" WHERE id = ${id} AND "empresaId" = ${empresaId}`;
       return { message: 'Manutenção removida com sucesso!' };
     } catch (error) {
       console.error('Erro ao remover manutenção:', error);
