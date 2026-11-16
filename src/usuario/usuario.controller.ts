@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Patch, Post, Req, HttpCode, HttpStatus, BadRequestException, UnauthorizedException, ConflictException, NotFoundException } from '@nestjs/common';
+import { Body, Controller, Get, Patch, Post, Req, HttpCode, HttpStatus, BadRequestException, UnauthorizedException, ConflictException, NotFoundException, ForbiddenException, ServiceUnavailableException } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { UsuarioService } from './usuario.service';
 import { CreateUsuarioDto } from './dto/create-usuario.dto';
@@ -23,13 +23,17 @@ export class UsuarioController {
       throw new NotFoundException('Usuário não encontrado!');
     }
     const { id, nome, email } = data[0];
-    return { id, nome, email };
+    return { id, nome, email, visitante: !!req.user.visitante };
   }
 
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Atualizar dados do usuário logado' })
   @Patch('me')
   async updateMe(@Req() req: any, @Body() dto: UpdatePerfilDto) {
+    // O usuário visitante é compartilhado por todos que entram pelo modo visitante
+    if (req.user.visitante) {
+      throw new ForbiddenException('O perfil não pode ser alterado no modo visitante!');
+    }
     if (!dto.senhaAtual) {
       throw new BadRequestException('Informe a senha atual!');
     }
@@ -87,6 +91,25 @@ export class UsuarioController {
 
     const accessToken = jwt.sign(
       { id: user.id, nome: user.nome, empresaId: user.empresaId },
+      process.env.TOKEN_SECRET,
+      { expiresIn: process.env.TOKEN_EXPIRES_IN },
+    );
+    return { user: { id: user.id, name: user.nome, email: user.email }, accessToken };
+  }
+
+  @Public()
+  @ApiOperation({ summary: 'Entrar como visitante (empresa de demonstração)' })
+  @Post('visitante')
+  @HttpCode(HttpStatus.OK)
+  async loginVisitante() {
+    const data = await this.usuarioService.findVisitante();
+    if (!Array.isArray(data) || data.length === 0) {
+      throw new ServiceUnavailableException('Modo visitante indisponível no momento!');
+    }
+    const user = data[0];
+
+    const accessToken = jwt.sign(
+      { id: user.id, nome: user.nome, empresaId: user.empresaId, visitante: true },
       process.env.TOKEN_SECRET,
       { expiresIn: process.env.TOKEN_EXPIRES_IN },
     );

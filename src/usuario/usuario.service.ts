@@ -33,6 +33,23 @@ export class UsuarioService {
         }
     }
 
+    /** Usuário da empresa de demonstração, usado pelo modo visitante. */
+    async findVisitante() {
+        try {
+            const data = await this.sql`
+                SELECT u.* FROM usuario u
+                JOIN "Empresa" e ON e.id = u."empresaId"
+                WHERE e.demo
+                ORDER BY u.id
+                LIMIT 1
+            `;
+            return data;
+        } catch (error) {
+            console.error('Erro ao buscar usuário visitante:', error);
+            return { message: 'Erro ao buscar usuário visitante!', error: error };
+        }
+    }
+
     async createUsuario(createUsuarioDto: CreateUsuarioDto){
         try {
             // Todo cadastro novo cria a sua própria empresa (num único comando,

@@ -1,85 +1,123 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# Caminhão API
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+API REST do **Stradus**, sistema de gestão de frotas de caminhões: fretes, abastecimentos, manutenções, custos fixos, salários de motoristas e documentos da empresa.
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+O front-end fica no repositório [stradusV2](../stradusV2).
 
-## Description
+## Tecnologias
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+- [NestJS 11](https://nestjs.com/) + TypeScript
+- PostgreSQL no [Neon](https://neon.tech/) (driver `@neondatabase/serverless`, SQL escrito à mão, sem ORM)
+- Autenticação com JWT (`jsonwebtoken`) e senhas com `bcrypt`
+- [Vercel Blob](https://vercel.com/docs/storage/vercel-blob) (privado) para arquivos de documentos e notas
+- Swagger para documentação dos endpoints
 
-## Project setup
+## Como rodar
+
+Pré-requisitos: Node.js 20+ e um banco PostgreSQL (Neon).
 
 ```bash
-$ pnpm install
+npm install
+cp .env.example .env   # ou crie o .env manualmente (veja abaixo)
+npm run start:dev
 ```
 
-## Compile and run the project
+A API sobe em `http://localhost:5000` (ou na porta definida em `PORT`).
+A documentação Swagger fica em **`http://localhost:5000/api`**.
 
-```bash
-# development
-$ pnpm run start
+### Variáveis de ambiente (`.env`)
 
-# watch mode
-$ pnpm run start:dev
+| Variável                | Descrição                                                        |
+| ----------------------- | ---------------------------------------------------------------- |
+| `DATABASE_URL`          | String de conexão do PostgreSQL (Neon)                           |
+| `TOKEN_SECRET`          | Segredo usado para assinar os JWT                                |
+| `TOKEN_EXPIRES_IN`      | Validade do token (ex.: `8h`, `7d`)                              |
+| `SALT`                  | Número de rounds do bcrypt (ex.: `10`)                           |
+| `BLOB_STORE_ID`         | ID do store do Vercel Blob                                       |
+| `BLOB_READ_WRITE_TOKEN` | Token de leitura/escrita do Vercel Blob                          |
+| `PORT`                  | Porta HTTP (opcional, padrão `5000`)                             |
 
-# production mode
-$ pnpm run start:prod
+## Scripts
+
+| Comando              | O que faz                              |
+| -------------------- | -------------------------------------- |
+| `npm run start:dev`  | Sobe em modo desenvolvimento (watch)   |
+| `npm run build`      | Compila para `dist/`                   |
+| `npm run start:prod` | Roda a versão compilada                |
+| `npm run lint`       | ESLint                                 |
+| `npm run format`     | Prettier                               |
+| `npm test`           | Testes unitários (Jest)                |
+
+## Banco de dados e migrations
+
+As migrations ficam em [`migrations/`](migrations) e são **executadas manualmente**, em ordem, no editor SQL do Neon (ou via `psql`). Todas podem ser executadas mais de uma vez sem efeito colateral.
+
+| Arquivo                                   | Conteúdo                                                        |
+| ----------------------------------------- | --------------------------------------------------------------- |
+| `001_nota.sql`                            | Notas (fotos/PDFs) anexadas a fretes e manutenções              |
+| `002_empresa.sql`                         | Multiempresa: tabela `Empresa` e coluna `empresaId` nas tabelas |
+| `003_adiantamento.sql`                    | Adiantamentos de salário dos motoristas                         |
+| `004_adiantamento_parcelas_notas.sql`     | Parcelas de desconto dos adiantamentos e notas em adiantamentos |
+| `005_empresa_demo.sql`                    | Empresa de demonstração e usuário do modo visitante             |
+
+> As tabelas base (`usuario`, `Caminhao`, `Motorista`, `Frete`, etc.) já existiam antes das migrations e não estão versionadas aqui.
+
+## Multiempresa
+
+Cada usuário pertence a uma **empresa** e só enxerga e altera os dados dela.
+
+- O `empresaId` vai no JWT e é lido nos controllers pelo decorator `@EmpresaId()` ([src/empresa/empresa.decorator.ts](src/empresa/empresa.decorator.ts)).
+- Todas as consultas filtram por `"empresaId"`; ids enviados no corpo da requisição (caminhão, motorista, oficina, fazenda) são validados com `vinculosDaEmpresa()` ([src/empresa/vinculos.ts](src/empresa/vinculos.ts)).
+- Todo cadastro novo (`POST /usuario/register`) cria a sua própria empresa.
+- `Estado`, `Cidade` e `Carga` são tabelas de referência compartilhadas entre empresas.
+
+## Autenticação
+
+Todas as rotas exigem `Authorization: Bearer <token>`, exceto as marcadas com `@Public()`:
+
+- `POST /usuario/login` — login com e-mail e senha
+- `POST /usuario/register` — cadastro de usuário (cria uma empresa nova)
+- `POST /usuario/visitante` — entrar como visitante
+
+O guard global fica em [src/auth/jwt.guard.ts](src/auth/jwt.guard.ts).
+
+### Modo visitante
+
+`POST /usuario/visitante` devolve um token do usuário "Visitante", que pertence à **empresa de demonstração** (`"Empresa".demo = true`, criada pela migration `005`). Com ele é possível usar o sistema inteiro — cadastrar, editar e excluir — sem afetar dados reais.
+
+- O usuário visitante não tem senha válida, então não entra pelo login normal.
+- O token carrega `visitante: true`; com ele `PATCH /usuario/me` é bloqueado (403), para ninguém trocar o e-mail ou a senha do usuário compartilhado.
+- Como todos os visitantes compartilham a mesma empresa, os dados de demonstração podem ser alterados por qualquer um. Para restaurá-los, apague os registros da empresa demo e execute a migration `005` de novo (os dados de exemplo só são inseridos quando a empresa não tem caminhões).
+
+## Módulos / endpoints
+
+| Recurso              | Rota base             | Observações                                                        |
+| -------------------- | --------------------- | ------------------------------------------------------------------ |
+| Usuário              | `/usuario`            | Login, cadastro, visitante, perfil (`/me`)                         |
+| Caminhões            | `/caminhao`           | CRUD                                                               |
+| Motoristas           | `/motorista`          | CRUD                                                               |
+| Caminhão × Motorista | `/caminhao-motorista` | Associação de motoristas a caminhões                               |
+| Oficinas             | `/oficina`            | CRUD                                                               |
+| Fazendas             | `/fazenda`            | CRUD + contatos                                                    |
+| Fretes               | `/frete`              | CRUD; comissão do motorista via `porcentagemMotorista`             |
+| Abastecimentos       | `/abastecimento`      | CRUD                                                               |
+| Manutenções          | `/manutencao`         | CRUD + parcelas de pagamento                                       |
+| Custos fixos         | `/custo-fixo`         | CRUD + ajustes de valor por mês                                    |
+| Adiantamentos        | `/adiantamento`       | Adiantamentos de salário, descontados em parcelas                  |
+| Documentos           | `/documento`          | Upload direto ao Vercel Blob (`upload-token` → `confirmar`)        |
+| Notas                | `/nota`               | Comprovantes de fretes, manutenções e adiantamentos                |
+| Dashboard            | `/dashboard`          | Resumo do mês, salários, extrato, últimas movimentações, contagens |
+| Estados/Cidades/Cargas | `/estado`, `/cidade`, `/carga` | Somente leitura                                      |
+
+Detalhes de cada rota (parâmetros e corpo) estão no Swagger em `/api`.
+
+## Estrutura
+
 ```
-
-## Run tests
-
-```bash
-# unit tests
-$ pnpm run test
-
-# e2e tests
-$ pnpm run test:e2e
-
-# test coverage
-$ pnpm run test:cov
+src/
+  auth/          guard JWT global e decorator @Public()
+  empresa/       decorator @EmpresaId() e validação de vínculos
+  <recurso>/     controller, service e DTOs de cada módulo
+  main.ts        bootstrap, CORS e Swagger
+migrations/      scripts SQL (executados manualmente)
 ```
-
-## Resources
-
-Check out a few resources that may come in handy when working with NestJS:
-
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
-
-## Support
-
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
-
-## Stay in touch
-
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
-
-## License
-
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
